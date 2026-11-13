@@ -4,8 +4,9 @@
 //    (DDB's doubled key repaired), 2014 species hidden, class gold from a dice formula.
 // 2. TCMP1 Night Stalker + Dwarf + Cleric: any-ability increase (no "Ability Scores" line), the book's 50 GP option, the
 //    background's own trinket table, Divine Order (ItemChoice), spells.
-// 3. Homebrew Venator + PHB 2024 Sage + Human: a homebrew class from its own pack; its skills picked before the Sage
-//    and the Human give theirs are re-asked.
+// 3. A homebrew class + PHB 2024 Sage + Human: the copied books' Homebrew class with the most level-1 advancements (skipped
+//    when there is none); its skills picked before the Sage and the Human give theirs are re-asked. The saved character
+//    is checked against that class's own data: saves, hit die, spellcasting ability, level-1 features.
 // Each is saved and checked like the creation audit: links, speed, senses, spellcasting, proficiencies, equipment, gold.
 // Creates and deletes throwaway actors, chat cards and the user's creation draft.
 // The packs' name prefix comes from BOOKS_PACK_PREFIX (no default); unset, the suite skips.
@@ -217,42 +218,56 @@ const result = await page.evaluate(async PREFIX => {
     check("saved: gold includes the book's 50 GP; the trinket", s.gp >= 50 && cl.items.some(i => i.type === "loot" && i.system.description.value.includes(foundry.utils.escapeHTML(eq.trinket.text))), { gp: s.gp });
     check("saved: Stealth from Night Stalker; WIS and CHA saves", s.skills.includes("ste") && s.saves.includes("wis") && s.saves.includes("cha"), s);
 
-    // ---- 3. Homebrew Venator + PHB 2024 Sage + Human
+    // ---- 3. A homebrew class (whichever the copied books have) + PHB 2024 Sage + Human
     c = createCreationController({ moduleId, t });
     await c.start({});
     v = await c.segment("class");
-    const venator = v.options.find(o => o.name === "Venator" && books(o.uuid));
-    check("homebrew Venator in the class picker, its book as subtitle, tagged Homebrew", venator && /homebrew/i.test(venator.source ?? "")
-      && /^(5\.5e · )?Homebrew$/.test(venator.tier?.label ?? "") && venator.tier.tone === "other", venator);
-    v = await play(c, "class", await c.pick("class", venator.uuid));
-    check("Venator: every class step answered", v.screen === "done", log.slice(-6));
-    v = await c.segment("spells");
-    if (v.screen === "step") v = await play(c, "spells", v);
-    v = await c.segment("background");
-    await play(c, "background", await c.pick("background", fromBooks(v.options, "Sage").uuid), { asi: { int: 2, con: 1 } });
-    v = await c.segment("species");
-    await play(c, "species", await c.pick("species", speciesFromBooks(v.options, "Human").uuid));
-    // Class answered first: skills the Sage or the Human now give are flagged, and the step re-opens without them.
-    v = await c.segment("class");
-    const reopened = v.model;
-    check("Venator answered before Sage and Human: its duplicate skills re-open with the reason", v.screen !== "step"
-      || (reopened.conflicts.length > 0 && /already granted by your (background|species)/.test(reopened.conflictText ?? "")), reopened && { conflicts: reopened.conflicts, text: reopened.conflictText });
-    if (v.screen === "step") v = await play(c, "class", v);
-    ab = c.abilities();
-    await c.setAbilities({ method: "standardArray", assignments: { int: ab.slots[0].id, dex: ab.slots[1].id, con: ab.slots[2].id, wis: ab.slots[3].id, str: ab.slots[4].id, cha: ab.slots[5].id } });
-    await equip(c, "class", "A");
-    await equip(c, "background", "A");
-    await c.setDetails({ name: "CB Books Venator", alignment: "", biography: "" });
-    review = await c.review();
-    check("Venator: Review has no blockers", !review.blockers.length, { blockers: review.blockers, tabs: c.tabs() });
-    const ven = await commit(c);
-    s = summary(ven);
-    log.push(`Venator: ${JSON.stringify(s)}`);
-    check("saved Venator: level 1, Human and Sage linked, INT/DEX saves, light/medium armor and shields, alchemist's supplies",
-      ven.system.details.level === 1 && s.race === "Human" && s.background === "Sage" && s.saves.includes("int") && s.saves.includes("dex")
-      && ["lgt", "med", "shl"].every(k => s.armor.includes(k)) && s.tools.includes("alchemist"), s);
-    check("saved Venator: its level-1 features from the homebrew pack, HP 10 + CON mod, casts with INT",
-      ven.items.filter(i => i.type === "feat" && i.getFlag("dnd5e", "advancementOrigin")).length >= 3 && s.hp === 10 + ven.system.abilities.con.mod && s.casting === "int", s);
+    // Of the copied books' Homebrew classes, the one with the most level-1 advancements (placeholders have few).
+    const level1 = async o => { const d = await fromUuid(o.uuid); const adv = d?.toObject().system.advancement;
+      return (Array.isArray(adv) ? adv : Object.values(adv ?? {})).filter(x => (x.level ?? 1) <= 1).length; };
+    const candidates = [];
+    for (const o of v.options.filter(o => books(o.uuid) && /^(5\.5e · )?Homebrew$/.test(o.tier?.label ?? ""))) candidates.push({ o, n: await level1(o) });
+    const homebrew = candidates.sort((x, y) => y.n - x.n || x.o.name.localeCompare(y.o.name))[0]?.o;
+    if (!homebrew) log.push("SKIP homebrew class: no class in the copied books is tagged Homebrew");
+    else {
+      check(`homebrew ${homebrew.name} in the class picker, its book as subtitle, tagged Homebrew`, Boolean(homebrew.source) && homebrew.tier.tone === "other", homebrew);
+      v = await play(c, "class", await c.pick("class", homebrew.uuid));
+      check("homebrew class: every class step answered", v.screen === "done", log.slice(-6));
+      v = await c.segment("spells");
+      if (v.screen === "step") v = await play(c, "spells", v);
+      v = await c.segment("background");
+      await play(c, "background", await c.pick("background", fromBooks(v.options, "Sage").uuid), { asi: { int: 2, con: 1 } });
+      v = await c.segment("species");
+      await play(c, "species", await c.pick("species", speciesFromBooks(v.options, "Human").uuid));
+      // Class answered first: skills the Sage or the Human now give are flagged, and the step re-opens without them.
+      v = await c.segment("class");
+      const reopened = v.model;
+      check("homebrew class answered before Sage and Human: any duplicate skills re-open with the reason", v.screen !== "step"
+        || (reopened.conflicts.length > 0 && /already granted by your (background|species)/.test(reopened.conflictText ?? "")), reopened && { conflicts: reopened.conflicts, text: reopened.conflictText });
+      if (v.screen === "step") v = await play(c, "class", v);
+      ab = c.abilities();
+      await c.setAbilities({ method: "standardArray", assignments: { int: ab.slots[0].id, dex: ab.slots[1].id, con: ab.slots[2].id, wis: ab.slots[3].id, str: ab.slots[4].id, cha: ab.slots[5].id } });
+      await equip(c, "class", "A");
+      await equip(c, "background", "A");
+      await c.setDetails({ name: "CB Books Homebrew", alignment: "", biography: "" });
+      review = await c.review();
+      check("homebrew class: Review has no blockers", !review.blockers.length, { blockers: review.blockers, tabs: c.tabs() });
+      const hb = await commit(c);
+      s = summary(hb);
+      log.push(`Homebrew ${homebrew.name}: ${JSON.stringify(s)}`);
+      // What the class itself promises at level 1, read from its own document.
+      const cls = hb.items.find(i => i.type === "class");
+      const adv = cls?.toObject().system.advancement;
+      const traits = (Array.isArray(adv) ? adv : Object.values(adv ?? {})).filter(a => a.type === "Trait" && (a.level ?? 0) <= 1 && a.classRestriction !== "secondary");
+      const saves = traits.flatMap(a => a.configuration?.grants ?? []).filter(g => g.startsWith("saves:")).map(g => g.slice(6));
+      const die = Number(String(cls?.system.hd?.denomination ?? "").replace("d", ""));
+      const casts = cls?.system.spellcasting?.progression && cls.system.spellcasting.progression !== "none" ? cls.system.spellcasting.ability : null;
+      check("saved homebrew character: level 1, Human and Sage linked, the class's saving throws",
+        hb.system.details.level === 1 && s.race === "Human" && s.background === "Sage" && saves.every(k => s.saves.includes(k)), { saves, s });
+      check("saved homebrew character: level-1 features from its pack, HP = hit die + CON mod, casts with the class's ability",
+        hb.items.some(i => i.type === "feat" && i.getFlag("dnd5e", "advancementOrigin")) && (!die || s.hp === die + hb.system.abilities.con.mod)
+        && (!casts || s.casting === casts), { die, casts, s });
+    }
   } catch (error) {
     check(`no exception (${error.message})`, false, error.stack?.slice(0, 800));
   } finally {

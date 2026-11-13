@@ -16,7 +16,6 @@ Mobile Deck is a fork of [VE Mobile](https://github.com/Silvestrae/ve-mobile) by
 - **Character Builder (D&D5e).** Level up, create a new character and choose spells on your phone, with the GM's choice of compendiums, books and house rules. A GM can approve players' level-ups and new characters.
 - **Player items.** Create and delete items from the Inventory tab.
 - **Party inventory.** Send, take, deposit and withdraw items and coins through a D&D5e Group actor, with every move run on the GM's client.
-- **Readable roll cards.** D&D5e roll cards keep their contrast in the Chat tab and the action sheet.
 
 To install, paste this manifest URL into Foundry's **Add-on Modules > Install Module** ([details below](#install-and-start-playing)):
 

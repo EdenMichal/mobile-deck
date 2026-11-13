@@ -1,0 +1,375 @@
+/*
+ * Player feedback (fork), spec 2026-11-13 §2: Create item on the dnd5e inventory.
+ * The sheet reuses the currency editor's layer and frame (.ve-currency-editor-layer / .ve-currency-editor), so it
+ * gets the same backdrop, entrance, theme accent, back-gesture handling and tablet split-screen placement.
+ * Everything here only adds the picker and the form inside that frame.
+ */
+
+/* Entry point: the "+" in the INVENTORY heading row. Its square look (34px, border, radius, pressed state) is the
+   sort and expand-all buttons' own, from .ve-collection-controls in ve-mobile.css; only keyboard focus is added here. */
+.ve-mobile-app .ve-collection-controls button.ve-item-create-open:focus-visible {
+  outline: 2px solid var(--ve-character-accent);
+  outline-offset: 1px;
+}
+
+/* The keyboard lifts the whole sheet: --ve-keyboard-inset is the height the on-screen keyboard covers (set from
+   visualViewport in item-create.mjs), so the sticky Create footer and the focused field stay above it. */
+.ve-currency-editor-layer.ve-item-create-layer {
+  padding-bottom: calc(max(12px, var(--ve-safe-bottom)) + var(--ve-keyboard-inset, 0px));
+  transition: padding-bottom 120ms ease-out;
+}
+
+/* The sheet: taller than the currency editor, so its body scrolls under a sticky header and footer. */
+.ve-currency-editor.ve-item-create {
+  width: min(100%, 520px);
+  padding-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+  scroll-padding-top: 74px;
+  scroll-padding-bottom: 86px;
+}
+.ve-item-create.is-confirming { filter: saturate(0.7) brightness(0.8); }
+.ve-item-create > header > div h2 { margin: 0; overflow-wrap: anywhere; }
+.ve-item-create-lead { display: grid; place-items: center; }
+.ve-item-create-lead > [hidden] { display: none !important; }
+.ve-mobile-app .ve-item-create button.ve-item-create-back {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ve-border);
+  border-radius: 10px;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+}
+.ve-item-create-heading-art { display: grid; place-items: center; }
+.ve-item-create-body { min-height: 0; }
+
+/* Step 1: the type picker. */
+.ve-item-create-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-bottom: 14px;
+}
+.ve-item-create-types > div { min-width: 0; display: grid; }
+.ve-mobile-app .ve-item-create button.ve-item-create-type {
+  min-height: 112px;
+  margin: 0;
+  padding: 14px 12px 12px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  justify-items: start;
+  gap: 10px;
+  border: 1px solid var(--ve-border);
+  border-radius: 14px 6px 14px 6px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  text-align: left;
+  transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 120ms ease-out;
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-type:active {
+  transform: scale(0.98);
+  border-color: color-mix(in srgb, var(--ve-character-accent) 72%, var(--ve-border));
+  background: color-mix(in srgb, var(--ve-character-accent) 13%, var(--ve-surface-up));
+}
+.ve-item-create-type-copy { min-width: 0; display: grid; gap: 3px; }
+.ve-item-create-type-copy strong { font-size: 0.92rem; font-weight: 850; line-height: 1.15; }
+.ve-item-create-type-copy small { color: var(--ve-subtle); font-size: 0.7rem; line-height: 1.3; }
+
+/* The type's dnd5e artwork as a mask, so it takes the character's accent in both themes. */
+.ve-item-create-glyph {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background-color: var(--ve-character-accent);
+  mask: center / contain no-repeat;
+  -webkit-mask: center / contain no-repeat;
+}
+.ve-item-create-glyph.is-icon { background: none; color: var(--ve-character-accent); font-size: 1.45rem; }
+
+/* Step 2: the form. */
+.ve-item-create-fields { display: grid; gap: 14px; padding-bottom: 14px; }
+.ve-item-create-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 10px; }
+.ve-item-create-row > :only-child { grid-column: 1 / -1; }
+.ve-item-create-field { min-width: 0; display: grid; gap: 6px; }
+.ve-item-create-field[hidden] { display: none; }
+.ve-item-create-label {
+  color: var(--ve-subtle);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* 16px text keeps iOS Safari from zooming the page when a field takes focus. */
+.ve-mobile-app .ve-item-create :is(input, select, textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 42%, var(--ve-border));
+  border-radius: 10px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font: 400 1rem/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  caret-color: var(--ve-character-accent);
+  box-shadow: none;
+}
+.ve-mobile-app .ve-item-create :is(input, textarea)::placeholder { color: color-mix(in srgb, var(--ve-subtle) 78%, transparent); }
+.ve-mobile-app .ve-item-create :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ve-character-accent);
+  outline-offset: 1px;
+}
+.ve-currency-editor.ve-item-create:focus { outline: none; }
+.ve-mobile-app .ve-item-create :is(input, select, textarea)[aria-invalid="true"] { border-color: #ee7b7b; }
+.ve-mobile-app .ve-item-create textarea { min-height: 92px; resize: vertical; }
+.ve-mobile-app .ve-item-create select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ve-subtle) 50%), linear-gradient(135deg, var(--ve-subtle) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+.ve-item-create ::selection { color: #fff; background: color-mix(in srgb, var(--ve-character-accent) 70%, #000); }
+.ve-mobile-app .ve-item-create input[name="name"] { font-weight: 700; }
+
+.ve-item-create-error { min-height: 0; color: #ee7b7b; font-size: 0.72rem; font-weight: 700; }
+.ve-item-create-error:empty { display: none; }
+.ve-mobile-app[data-theme="light"] .ve-item-create-error { color: #b4232f; }
+.ve-mobile-app[data-theme="light"] .ve-item-create :is(input, select, textarea)[aria-invalid="true"] { border-color: #b4232f; }
+.ve-item-create-hint { color: var(--ve-subtle); font-size: 0.7rem; }
+
+/* Quantity stepper. */
+.ve-item-create-stepper { display: grid; grid-template-columns: 46px minmax(0, 1fr) 46px; gap: 6px; }
+.ve-mobile-app .ve-item-create .ve-item-create-stepper input { padding-inline: 4px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ve-mobile-app .ve-item-create .ve-item-create-stepper button {
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ve-border);
+  border-radius: 10px;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+}
+
+/* Price: amount, then the five coins as a segmented control in the currency strip's colours. */
+.ve-item-create-price { display: grid; grid-template-columns: minmax(78px, 0.8fr) minmax(0, 2fr); gap: 8px; }
+.ve-mobile-app .ve-item-create .ve-item-create-price input { font-variant-numeric: tabular-nums; }
+.ve-item-create-coins {
+  min-width: 0;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid var(--ve-border);
+  border-radius: 10px;
+  background: var(--ve-surface);
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-coin {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ve-subtle);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-coin[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--ve-coin, var(--ve-character-accent)) 70%, transparent);
+  color: var(--ve-coin, var(--ve-character-accent));
+  background: color-mix(in srgb, var(--ve-coin, var(--ve-character-accent)) 16%, var(--ve-surface-up));
+}
+.ve-item-create-coin.is-pp { --ve-coin: #9fb6d8; }
+.ve-item-create-coin.is-gp { --ve-coin: #d8ad45; }
+.ve-item-create-coin.is-ep { --ve-coin: #65aaa5; }
+.ve-item-create-coin.is-sp { --ve-coin: #aeb5bf; }
+.ve-item-create-coin.is-cp { --ve-coin: #ce8055; }
+.ve-mobile-app[data-theme="light"] .ve-item-create-coin.is-pp { --ve-coin: #516984; }
+.ve-mobile-app[data-theme="light"] .ve-item-create-coin.is-gp { --ve-coin: #80600d; }
+.ve-mobile-app[data-theme="light"] .ve-item-create-coin.is-ep { --ve-coin: #2d6e6b; }
+.ve-mobile-app[data-theme="light"] .ve-item-create-coin.is-sp { --ve-coin: #59616c; }
+.ve-mobile-app[data-theme="light"] .ve-item-create-coin.is-cp { --ve-coin: #925033; }
+
+/* Picture and name side by side; the picture opens this type's presets. */
+.ve-item-create-identity { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: end; gap: 12px; }
+.ve-mobile-app .ve-item-create button.ve-item-create-picture,
+.ve-item-create-picture.is-static {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 50%, var(--ve-border));
+  border-radius: 14px 6px 14px 6px;
+  background: var(--ve-surface-up);
+  overflow: visible;
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-picture[aria-expanded="true"] { border-color: var(--ve-character-accent); }
+.ve-item-create-picture-preview { display: grid; place-items: center; }
+.ve-item-create-picture-edit {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ve-surface);
+  border-radius: 999px;
+  color: #fff;
+  background: var(--ve-character-accent);
+  font-size: 0.62rem;
+}
+.ve-item-create-picture-art { width: 44px; height: 44px; display: grid; place-items: center; }
+span.ve-item-create-picture-art { background-color: var(--ve-character-accent); mask: center / contain no-repeat; -webkit-mask: center / contain no-repeat; }
+img.ve-item-create-picture-art { object-fit: contain; border: 0; border-radius: 6px; }
+.ve-item-create-picture-art.is-icon { background: none; color: var(--ve-character-accent); font-size: 1.4rem; }
+.ve-item-create-pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--ve-border);
+  border-radius: 12px;
+  background: var(--ve-surface);
+}
+.ve-item-create-pictures[hidden] { display: none; }
+.ve-mobile-app .ve-item-create button.ve-item-create-picture-choice {
+  min-width: 0;
+  height: 56px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--ve-surface-up);
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-picture-choice[aria-pressed="true"] {
+  border-color: var(--ve-character-accent);
+  background: color-mix(in srgb, var(--ve-character-accent) 18%, var(--ve-surface-up));
+}
+.ve-item-create-picture-choice .ve-item-create-picture-art { width: 40px; height: 40px; }
+
+/* The type's own details, set apart by a hairline and a heading. */
+.ve-item-create-details {
+  min-width: 0;
+  margin: 2px 0 0;
+  padding: 12px 0 0;
+  display: grid;
+  gap: 12px;
+  border: 0;
+  border-top: 1px solid var(--ve-border);
+}
+.ve-item-create-details > legend {
+  padding: 0 8px 0 0;
+  color: var(--ve-character-accent);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+.ve-item-create-damage { display: grid; grid-template-columns: 58px 76px minmax(0, 1fr); gap: 6px; }
+.ve-mobile-app .ve-item-create .ve-item-create-damage input { text-align: center; font-weight: 800; }
+
+.ve-item-create-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ve-mobile-app .ve-item-create button.ve-item-create-chip {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--ve-border);
+  border-radius: 999px;
+  color: var(--ve-subtle);
+  background: var(--ve-surface-up);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 75%, var(--ve-border));
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-character-accent) 22%, var(--ve-surface-up));
+}
+
+/* Create stays in reach of the thumb: a sticky footer at the bottom of the sheet. */
+.ve-item-create-footer {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  margin: 0 -14px;
+  padding: 10px 14px max(14px, var(--ve-safe-bottom));
+  border-top: 1px solid var(--ve-border);
+  background: var(--ve-surface);
+}
+.ve-mobile-app .ve-item-create button.ve-item-create-submit { min-height: 50px; font-size: 0.92rem; }
+.ve-item-create.is-pending { cursor: progress; }
+.ve-item-create.is-pending .ve-item-create-submit i { animation: ve-item-create-pulse 900ms ease-in-out infinite alternate; }
+@keyframes ve-item-create-pulse { from { opacity: 0.45; } to { opacity: 1; } }
+
+/* "Discard this item?": a small VE card over the sheet's lower edge, in thumb reach. */
+.ve-item-create-confirm {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 12px;
+  bottom: calc(max(12px, var(--ve-safe-bottom)) + var(--ve-keyboard-inset, 0px));
+  width: min(calc(100% - 24px), 480px);
+  margin-inline: auto;
+  padding: 16px 14px 14px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 68%, var(--ve-border));
+  border-radius: 18px 8px 18px 8px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  box-shadow: 0 -12px 50px rgb(0 0 0 / 0.55);
+  animation: ve-hp-editor-in 200ms cubic-bezier(0.2, 0.85, 0.3, 1.08) both;
+}
+.ve-item-create-confirm h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.05rem; }
+.ve-item-create-confirm p { margin: 0 0 6px; color: var(--ve-subtle); font-size: 0.8rem; }
+.ve-mobile-app .ve-item-create-confirm button.ve-modal-button { min-height: 48px; }
+.ve-mobile-app .ve-item-create-confirm button:focus-visible { outline: 2px solid var(--ve-character-accent); outline-offset: 1px; }
+
+/* Player feedback (fork): Delete from the inventory item menu. The same card as "Discard this item?", standing on its
+   own backdrop (the currency editor's layer) instead of over the creator sheet. */
+.ve-currency-editor-layer.ve-item-delete-layer { padding-bottom: max(12px, var(--ve-safe-bottom)); }
+.ve-item-delete-layer > .ve-item-create-confirm { position: relative; inset: auto; bottom: auto; width: min(100%, 480px); }
+.ve-item-delete-confirm h3 { overflow-wrap: anywhere; }
+.ve-item-delete-confirm.is-pending { cursor: progress; }
+.ve-item-delete-confirm.is-pending .ve-item-delete-confirm-button i { animation: ve-item-create-pulse 900ms ease-in-out infinite alternate; }
+/* The destructive button: dnd5e's failure colours, which VE already themes for dark and light (--ve-roll-failure). */
+.ve-mobile-app button.ve-modal-button.is-danger {
+  border-color: color-mix(in srgb, var(--ve-roll-failure) 70%, var(--ve-border));
+  color: var(--ve-roll-failure);
+  background: var(--ve-roll-failure-surface);
+}
+.ve-mobile-app button.ve-modal-button.is-danger:active { background: color-mix(in srgb, var(--ve-roll-failure) 22%, var(--ve-roll-failure-surface)); }
+.ve-mobile-app .ve-item-delete-confirm button.ve-modal-button:disabled { opacity: 0.62; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ve-mobile-app .ve-item-create button.ve-item-create-type { transition: none; }
+  .ve-item-create.is-pending .ve-item-create-submit i { animation: none; }
+  .ve-item-create-confirm { animation: none; }
+  .ve-item-delete-confirm.is-pending .ve-item-delete-confirm-button i { animation: none; }
+  .ve-currency-editor-layer.ve-item-create-layer { transition: none; }
+}
+
+@container (max-width: 340px) {
+  .ve-item-create-price { grid-template-columns: minmax(0, 1fr); }
+}

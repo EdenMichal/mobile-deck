@@ -1,0 +1,15 @@
+{
+  "id": "../../../",
+  "name": "Mobile Deck",
+  "short_name": "Mobile Deck",
+  "start_url": "../../../game",
+  "scope": "../../../",
+  "display_override": ["fullscreen", "standalone"],
+  "display": "standalone",
+  "background_color": "#17141c",
+  "theme_color": "#17141c",
+  "icons": [
+    { "src": "app-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "app-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

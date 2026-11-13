@@ -1,0 +1,757 @@
+import { localizeFoundry } from "./localization.mjs";
+const RESOLUTION_MESSAGE_KEYS = new Set([
+  "ERROR.RESOLUTION.Screen",
+  "ERROR.RESOLUTION.Scale",
+  "ERROR.RESOLUTION.Window"
+]);
+const APPLICATION_LINEAGE_MS = 1000;
+const NATIVE_APPLICATION_LAYER = 5100;
+const NATIVE_APPLICATION_LAYER_PROPERTY = "--ve-mobile-native-app-layer";
+const APPLICATION_CONTROL_SELECTOR = [
+  "button",
+  "[role='button']",
+  "[role='menuitem']",
+  "[role='tab']",
+  "[data-action]",
+  "a[href]",
+  "input[type='button']",
+  "input[type='submit']",
+  "input[type='reset']",
+  "input[type='file']",
+  "summary"
+].join(", ");
+const APPLICATION_ORIGIN_SELECTOR = [
+  ".ve-mobile-app",
+  ".ve-mobile-bootstrap",
+  ".ve-mobile-dialog",
+  ".ve-mobile-transient-app",
+  ".ve-mobile-module-overlay-visible",
+  "#hud.ve-mobile-native-hud-host",
+  "#context-menu",
+  "#prosemirror-dropdown"
+].join(", ");
+
+/**
+ * Isolate the mobile renderer from desktop applications while retaining
+ * ordinary Foundry notifications. Foundry's minimum-resolution warning is
+ * irrelevant here because this renderer is deliberately designed for a
+ * narrow viewport.
+ */
+export function enableMobilePresentation(scope, { isPersistentOverlay = () => false, isSettingsApplication = () => false, isActorEditor = () => false, now = () => Date.now(), trace = () => {} } = {}) {
+  suppressFutureResolutionWarnings(scope);
+  const applications = enableMobileApplications(scope, { isPersistentOverlay, isSettingsApplication, isActorEditor, now, trace });
+
+  // Remove Foundry’s desktop minimum-resolution warning while mobile presentation owns the surface.
+  const removeResolutionWarnings = () => {
+    for (const notification of document.querySelectorAll("#notifications .notification")) {
+      if (!isResolutionWarning(notification.textContent)) continue;
+      const close = notification.querySelector(".close, [data-action='close']");
+      if (close instanceof HTMLElement) close.click();
+      else notification.remove();
+    }
+  };
+
+  const notifications = document.getElementById("notifications");
+  const observer = notifications ? new MutationObserver(removeResolutionWarnings) : null;
+  observer?.observe(notifications, { childList: true, subtree: true });
+  scope.own(() => observer?.disconnect());
+  removeResolutionWarnings();
+  return applications;
+}
+
+/** Own presentation only on VE-rendered roots; native windows keep their CSS. */
+export function enableVeStyleAuthority(scope, {
+  document = globalThis.document,
+  enabled: initialEnabled = true,
+  trace = () => {}
+} = {}) {
+  let enabled = Boolean(initialEnabled);
+  // Return the current persistent mobile root elements used for presentation reconciliation.
+  const roots = () => [...(document?.querySelectorAll?.(".ve-mobile-app") ?? [])];
+  // Apply the current mobile/desktop state to the presentation roots and owned patches.
+  const reconcile = () => {
+    const activeRoots = roots();
+    for (const root of activeRoots) {
+      if (enabled) root.setAttribute("data-ve-style-authority", "");
+      else root.removeAttribute("data-ve-style-authority");
+    }
+    trace({ enabled, authorityRoots: enabled ? activeRoots.length : 0, mode: "scoped-css", exceptionalSuppression: false });
+  };
+  scope.own(() => {
+    enabled = false;
+    reconcile();
+  });
+  reconcile();
+  return Object.freeze({
+    setEnabled(value) {
+      enabled = Boolean(value);
+      reconcile();
+    },
+    snapshot() {
+      return Object.freeze({ enabled, authorityRoots: roots().filter((root) => root.hasAttribute("data-ve-style-authority")).length,
+        mode: "scoped-css", exceptionalSuppression: false });
+    }
+  });
+}
+
+/** Admit native windows by live role and user interaction, then restore their
+ * layers, viewport variables, listeners and lineage timers with this scope. */
+export function enableMobileApplications(scope, {
+  isPersistentOverlay = () => false,
+  isSettingsApplication = () => false,
+  isActorEditor = () => false,
+  now = () => Date.now(),
+  trace = () => {},
+  document = globalThis.document,
+  browser = globalThis.window,
+  getExistingApplications = () => [
+    ...Object.values(globalThis.ui?.windows ?? {}),
+    ...registryValues(globalThis.foundry?.applications?.instances)
+  ],
+  MutationObserverType = globalThis.MutationObserver,
+  schedule = (callback, delay) => setTimeout(callback, delay),
+  cancel = (id) => clearTimeout(id)
+} = {}) {
+  const admissions = createMobileApplicationAdmissions(document?.body);
+  const pendingApplications = new Map();
+  // DOM-only prompts can remain mounted while hidden (for example Vue's
+  // v-show). This scope retains their roots, not an active modal claim, so a
+  // later visibility change can admit them without a Foundry render hook.
+  const domDialogs = new Set();
+  const existingApplications = new Set(getExistingApplications().filter(application => applicationElement(application)?.isConnected !== false && applicationElement(application)));
+  const baselineElements = new WeakSet();
+  for (const application of existingApplications) {
+    const element = applicationElement(application);
+    if (element) baselineElements.add(element);
+  }
+  for (const element of document?.querySelectorAll?.(".application, .app.window-app, dialog, [role='dialog']") ?? []) baselineElements.add(element);
+  const lineage = createUserInteractionLineage({ now, trace, schedule, cancel });
+  // Capture application ancestry before classifying a native application’s presentation role.
+  const beginLineage = (event) => lineage.begin(event);
+  const admit = (application, rendered, { preExisting = false } = {}) => {
+    // The live role decides native admission; interaction lineage is diagnostic.
+    // Retained identity does not bypass reclassification.
+    const element = applicationElement(application, rendered);
+    if (application && element && domDialogs.delete(element) && admissions.has(element)) admissions.release(element, element);
+    const key = application ?? element;
+    if (application && (!element || element.isConnected === false)) pendingApplications.set(application, rendered);
+    else if (application) pendingApplications.delete(application);
+    const retained = admissions.has(key);
+    const correlation = retained ? null : lineage.match(application, element);
+    const baseline = preExisting || existingApplications.has(application) || baselineElements.has(element);
+    const classification = classifyMobileApplication(element, application, {
+      preExisting: baseline,
+      retained,
+      activeBaseline: baseline && (element?.matches?.("form, [role='dialog']") || element?.querySelector?.("form"))
+        && element?.contains?.(document?.activeElement) && document?.activeElement !== document?.body,
+      isPersistentOverlay,
+      isSettingsApplication,
+      isActorEditor
+    });
+    if (!classification.admitted) {
+      admissions.release(key, element);
+      traceApplication(trace, "suppressed", application, element, correlation, classification, now(), document?.body, baseline);
+      return;
+    }
+    if (!admissions.admit(key, element, classification.modal, correlation, application)) {
+      traceApplication(trace, "suppressed", application, element, correlation, { reason: "disconnected application root", modal: false }, now(), document?.body, baseline);
+      return;
+    }
+    if (correlation) lineage.claim(application, element);
+    traceApplication(trace, "admitted", application, element, correlation, classification, now(), document?.body, baseline);
+  };
+  const release = (application, rendered) => {
+    // Closing an Application releases both its identity record and the modal
+    // layer it may have owned, even when the rendered root is already detached.
+    const element = applicationElement(application, rendered);
+    pendingApplications.delete(application);
+    admissions.release(application ?? element, element);
+    traceApplication(trace, "disposed", application, element, null, { reason: "application close", modal: false }, now(), document?.body);
+  };
+  scope.listen(document, "pointerdown", beginLineage, { capture: true, passive: true });
+  scope.listen(document, "click", beginLineage, { capture: true, passive: true });
+  scope.listen(document, "keydown", beginLineage, { capture: true });
+  scope.hook?.("renderApplication", admit);
+  scope.hook?.("renderActorSheet", admit);
+  scope.hook?.("renderItemSheet", admit);
+  scope.hook?.("renderApplicationV2", admit);
+  scope.hook?.("closeApplication", release);
+  scope.hook?.("closeActorSheet", release);
+  scope.hook?.("closeItemSheet", release);
+  scope.hook?.("closeApplicationV2", release);
+  for (const application of existingApplications) admit(application, null, { preExisting: true });
+  // Reconcile only DOM-owned prompts. Native Application identities continue
+  // to use their render/close hooks and must never be replaced by DOM fallback.
+  const reconcileDomDialog = (element) => {
+    if (element.isConnected === false) {
+      domDialogs.delete(element);
+      if (admissions.has(element)) admissions.release(element, element);
+      return;
+    }
+    if (!domDialogIsDisplayed(element)) {
+      if (admissions.has(element)) admissions.release(element, element);
+    } else if (!admissions.hasElement(element) && !element.closest?.(".ve-mobile-admitted-app, .ve-mobile-settings-app")) {
+      admit(null, element, { preExisting: baselineElements.has(element) });
+    }
+  };
+  // Retain eligible DOM roots even when hidden, while excluding VE's own UI
+  // and nested controls already owned by an admitted native application.
+  const discoverDomDialog = (element) => {
+    if (admissions.hasElement(element) || element.closest?.(".ve-mobile-app, .ve-mobile-bootstrap, .ve-mobile-admitted-app, .ve-mobile-settings-app")) return;
+    domDialogs.add(element);
+    reconcileDomDialog(element);
+  };
+  for (const element of mobileDialogElements(document.body)) {
+    discoverDomDialog(element);
+  }
+  // Foundry's registries can retain an already-closed Application while a
+  // presentation switch is starting. Enforce the backdrop invariant before
+  // the new VE root becomes interactive rather than waiting for another DOM
+  // mutation to trigger observer cleanup.
+  admissions.reconcile();
+
+  let pruneQueued = false;
+  const observer = MutationObserverType && document?.body ? new MutationObserverType((mutations) => {
+    // Hooks provide the strongest Application identity; this observer covers
+    // dialog roots that Foundry mounts directly into DOM without a hook.
+    // A lifecycle-owned root wins over the DOM-only dialog fallback when both
+    // become connected in the same mutation delivery.
+    for (const [application, rendered] of pendingApplications) {
+      if (applicationElement(application, rendered)?.isConnected === true) admit(application, rendered);
+    }
+    for (const mutation of mutations) for (const node of mutation.addedNodes ?? []) {
+      for (const element of mobileDialogElements(node)) {
+        discoverDomDialog(element);
+      }
+    }
+    // Attribute changes matter only on a tracked prompt or one of its
+    // ancestors. Unrelated VE renders perform no style reads; idempotent
+    // reconciliation also avoids observer loops from our own class/layer writes.
+    for (const element of domDialogs) {
+      if (element.isConnected === false || mutations.some(mutation => mutation.type === "attributes"
+        && (mutation.target === element || mutation.target?.contains?.(element)))) reconcileDomDialog(element);
+    }
+    if (pruneQueued || !admissions.size) return;
+    pruneQueued = true;
+    queueMicrotask(() => {
+      pruneQueued = false;
+      const removed = admissions.reconcile();
+      if (removed) trace({ type: "application-admission-pruned", removed });
+    });
+  }) : null;
+  observer?.observe(document.body, { childList: true, subtree: true,
+    attributes: true, attributeFilter: ["open", "hidden", "style", "class"] });
+  scope.own(() => observer?.disconnect?.());
+  scope.listen(document, "pointerdown", (event) => {
+    const top = event?.target?.closest?.(".ve-mobile-admitted-app");
+    if (top) admissions.raise(top);
+  }, { capture: true, passive: true });
+
+  const visualViewport = browser?.visualViewport;
+  const viewportProperties = ["--ve-mobile-viewport-height", "--ve-mobile-viewport-width", "--ve-mobile-viewport-top", "--ve-mobile-viewport-left"];
+  const previousViewport = viewportProperties.map(name => [name, document.body.style.getPropertyValue(name), document.body.style.getPropertyPriority(name)]);
+  // Refresh the viewport-dependent mobile layout and shared layer measurements.
+  const updateViewport = () => {
+    const values = [visualViewport?.height ?? browser?.innerHeight ?? 0, visualViewport?.width ?? browser?.innerWidth ?? 0,
+      visualViewport?.offsetTop ?? 0, visualViewport?.offsetLeft ?? 0];
+    viewportProperties.forEach((name, index) => document.body.style.setProperty(name, `${Math.round(values[index])}px`));
+  };
+  updateViewport();
+  scope.listen(visualViewport, "resize", updateViewport, { passive: true });
+  scope.listen(visualViewport, "scroll", updateViewport, { passive: true });
+  scope.listen(browser, "resize", updateViewport, { passive: true });
+
+  scope.own(() => {
+    lineage.dispose();
+    pendingApplications.clear();
+    domDialogs.clear();
+    admissions.clear();
+    for (const [name, value, priority] of previousViewport) {
+      if (value) document.body.style.setProperty(name, value, priority);
+      else document.body.style.removeProperty(name);
+    }
+  });
+  // Reclassify currently open applications and update their mobile admission or suppression state.
+  const reconcileApplications = () => admissions.reconcile(record => classifyMobileApplication(record.element, record.application, {
+    retained: true, isPersistentOverlay, isSettingsApplication, isActorEditor
+  }).admitted);
+  return Object.freeze({ admissions, lineage, reconcileApplications });
+}
+
+/** A mounted prompt owns no mobile backdrop while it or an ancestor is
+ * display:none/hidden, or its native dialog is closed. Do not use inherited
+ * visibility: VE intentionally hides desktop shells before native admission. */
+function domDialogIsDisplayed(element) {
+  if (element.matches?.("dialog") && !element.hasAttribute?.("open")) return false;
+  const browser = element.ownerDocument?.defaultView;
+  for (let current = element; current; current = current.parentElement) {
+    if (current.hidden || browser?.getComputedStyle?.(current)?.display === "none") return false;
+  }
+  return true;
+}
+
+/** Track admission by Application identity so a rerendered or already-closed
+ * Application cannot leave a disconnected modal root holding the backdrop. */
+export function createMobileApplicationAdmissions(body) {
+  // Centralize admitted-root classes, layer ordering, active-modal backdrop
+  // ownership and subscriber updates in one deterministic lifecycle object.
+  const records = new Map();
+  const closing = new Set();
+  const listeners = new Set();
+  // Publish the current presentation state to the owning service callback.
+  const publish = () => { for (const listener of listeners) listener(); };
+  // Remove presentation-owned classes from elements left by the previous render.
+  const clearClasses = (element, record) => {
+    element?.classList?.remove?.("ve-mobile-admitted-app", "ve-mobile-dialog", "ve-mobile-transient-app");
+    if (!element?.style || !record) return;
+    if (record.priorLayer) element.style.setProperty(NATIVE_APPLICATION_LAYER_PROPERTY, record.priorLayer, record.priorLayerPriority);
+    else element.style.removeProperty(NATIVE_APPLICATION_LAYER_PROPERTY);
+  };
+  // Reapply the authoritative layer values to current VE and admitted native surfaces.
+  const refreshLayers = () => {
+    let index = 0;
+    for (const record of records.values()) record.element?.style?.setProperty?.(NATIVE_APPLICATION_LAYER_PROPERTY, String(NATIVE_APPLICATION_LAYER + index++));
+    publish();
+  };
+  // Prune stale admissions and retain the mobile backdrop only for owned modals.
+  const reconcileBackdrop = (forceLayers = false, retain = null) => {
+    let removed = false;
+    for (const [key, record] of records) {
+      if (record.element?.isConnected !== false && (!retain || retain(record))) continue;
+      clearClasses(record.element, record);
+      records.delete(key);
+      closing.delete(key);
+      removed = true;
+    }
+    if (removed || forceLayers) refreshLayers();
+    body?.classList?.toggle?.("ve-mobile-dialog-open", [...records.values()].some((record) => record.modal));
+  };
+  return Object.freeze({
+    get size() { return records.size; },
+    watch(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    get layers() { return [...records.values()].map((_, index) => `native-app:${index}`); },
+    has: (key) => records.has(key),
+    hasElement: (element) => [...records.values()].some((record) => record.element === element),
+    // Return the highest admitted native application still owned by the current presentation.
+    topmost() {
+      this.reconcile();
+      const entries = [...records.entries()];
+      const [key, record] = entries.at(-1) ?? [];
+      return record ? Object.freeze({ key, application: record.application, element: record.element }) : null;
+    },
+    // Close the highest admitted transient application while preventing duplicate close requests.
+    closeTopmost() {
+      const top = this.topmost();
+      if (!top || closing.has(top.key)) return false;
+      closing.add(top.key);
+      try {
+        if (typeof top.application?.close === "function") {
+          void Promise.resolve(top.application.close()).catch(() => closing.delete(top.key));
+        } else {
+          const control = top.element?.querySelector?.("[data-action='close'], .window-header button.close, .window-header .header-control.close, button[aria-label='Close']");
+          if (control?.click) control.click();
+          else {
+            const EventClass = top.element?.ownerDocument?.defaultView?.Event ?? globalThis.Event;
+            top.element?.dispatchEvent?.(typeof EventClass === "function" ? new EventClass("ve-close") : { type: "ve-close" });
+          }
+        }
+      } catch {
+        closing.delete(top.key);
+        return false;
+      }
+      return true;
+    },
+    // Move an admitted element to the top of the shared native application layer order.
+    raise(element) {
+      const entry = [...records].find(([, record]) => record.element === element);
+      if (!entry) return false;
+      records.delete(entry[0]);
+      records.set(entry[0], entry[1]);
+      refreshLayers();
+      return true;
+    },
+    // Admit a connected compatible application root and retain its original layer styling for cleanup.
+    admit(key, element, modal, lineage = null, application = null) {
+      if (!key || !element?.classList) return false;
+      if (element.isConnected === false) {
+        clearClasses(element, records.get(key));
+        records.delete(key);
+        closing.delete(key);
+        reconcileBackdrop(true);
+        return false;
+      }
+      const previous = records.get(key);
+      if (previous?.element !== element) clearClasses(previous?.element, previous);
+      const style = element.style;
+      const priorLayer = previous?.element === element ? previous.priorLayer : style?.getPropertyValue?.(NATIVE_APPLICATION_LAYER_PROPERTY) ?? "";
+      const priorLayerPriority = previous?.element === element ? previous.priorLayerPriority : style?.getPropertyPriority?.(NATIVE_APPLICATION_LAYER_PROPERTY) ?? "";
+      records.delete(key);
+      element.classList.add("ve-mobile-admitted-app");
+      element.classList.remove("ve-mobile-dialog", "ve-mobile-transient-app");
+      element.classList.add(modal ? "ve-mobile-dialog" : "ve-mobile-transient-app");
+      records.set(key, Object.freeze({ element, application, modal: Boolean(modal), lineage, priorLayer, priorLayerPriority }));
+      reconcileBackdrop(true);
+      return true;
+    },
+    // Release an application's admission and restore the presentation classes and layer state it owned.
+    release(key, element = null) {
+      const previous = records.get(key);
+      clearClasses(previous?.element, previous);
+      if (element !== previous?.element) clearClasses(element);
+      records.delete(key);
+      closing.delete(key);
+      reconcileBackdrop(true);
+    },
+    reconcile(retain = null) {
+      const before = records.size;
+      reconcileBackdrop(false, retain);
+      return before - records.size;
+    },
+    // Restore all admitted application state when mobile presentation ownership ends.
+    clear() {
+      for (const record of records.values()) clearClasses(record.element, record);
+      records.clear();
+      closing.clear();
+      body?.classList?.remove?.("ve-mobile-dialog-open");
+      publish();
+    }
+  });
+}
+
+/** Find dialog-like roots inside a mutation node without promoting nested
+ * controls that already belong to an admitted native application. */
+export function mobileDialogElements(root) {
+  if (!root?.matches || !root?.querySelectorAll) return [];
+  const selector = [
+    "dialog",
+    "[role='dialog']",
+    ".application.dialog",
+    ".app.window-app.dialog",
+    ".application.activity-choice",
+    ".application.activity-usage",
+    ".application.roll-configuration",
+    ".application.midi-targeting",
+    "#midi-qol-targetConfirmation"
+  ].join(", ");
+  const elements = root.matches(selector) ? [root] : [];
+  elements.push(...root.querySelectorAll(selector));
+  return elements;
+}
+
+/** New lifecycle-known windows are admitted unless a concrete desktop owner replaces them. */
+export function classifyMobileApplication(element, application = null, { preExisting = false, retained = false, activeBaseline = false, isPersistentOverlay = () => false, isSettingsApplication = () => false, isActorEditor = () => false } = {}) {
+  if (!element?.matches || element.closest?.(".ve-mobile-app, .ve-mobile-bootstrap")) return Object.freeze({ admitted: false, modal: false, reason: "VE-owned" });
+  if (element.isConnected === false) return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.DisconnectedApplicationRoot", "disconnected application root") });
+  if (isSettingsApplication(application, element) || element.matches(".ve-mobile-settings-app")) return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.NativeSettingsSessionOwnsApplication", "native Settings session owns application") });
+  if (element.matches("#interface, #sidebar, #hud, #players, #scene-controls, #scene-navigation, #hotbar, .ve-mobile-module-overlay-visible, .ve-mobile-module-overlay-host")) {
+    return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.PersistentShellOrOverlay", "persistent shell or overlay") });
+  }
+  const modal = element.matches("dialog, [role='dialog'], .dialog, .activity-choice, .activity-usage, .roll-configuration, .midi-targeting, #midi-qol-targetConfirmation")
+    || application?.options?.modal === true;
+  // A persistent overlay may render a child surface through its own
+  // Application lifecycle. Admitting that child as a native window would
+  // stretch it across the viewport and make its transparent area eat taps.
+  if (isPersistentOverlay(element, application) || (!modal && hasPersistentOverlayAncestor(element, isPersistentOverlay))) {
+    return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.PersistentSceneOverlay", "persistent Scene overlay") });
+  }
+  if (actorSheetApplication(application) && !isActorEditor(application)) return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.ActorSheetReplacedByCharacter", "Actor sheet replaced by Character") });
+  if (desktopSidebarApplication(application, element)) return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.DesktopSidebarWorkspaceReplacedByVENavigation", "desktop sidebar workspace replaced by Mobile Deck navigation") });
+  if (preExisting && !retained && !modal && !activeBaseline) return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.MobileActivationBaselineWorkspace", "mobile activation baseline workspace") });
+  if (!application && !modal) return Object.freeze({ admitted: false, modal: false, reason: localizeFoundry("VEMOBILE.Interface.MobilePresentation.NoApplicationLifecycle", "no application lifecycle") });
+  return Object.freeze({ admitted: true, modal, reason: modal ? localizeFoundry("VEMOBILE.Interface.MobilePresentation.NativeModalApplication", "native modal application") : activeBaseline ? localizeFoundry("VEMOBILE.Interface.MobilePresentation.ActiveBaselineWorkflow", "active baseline workflow") : preExisting ? localizeFoundry("VEMOBILE.Interface.MobilePresentation.RetainedApplicationLifecycle", "retained application lifecycle") : localizeFoundry("VEMOBILE.Interface.MobilePresentation.NewNativeApplicationLifecycle", "new native application lifecycle") });
+}
+
+// Check whether an admitted module overlay already owns the candidate’s ancestor surface.
+function hasPersistentOverlayAncestor(element, isPersistentOverlay) {
+  for (let parent = element?.parentElement; parent; parent = parent.parentElement) {
+    // Foundry's body and desktop shell also contain module identity classes
+    // (including scene-navigation classes). They are hosts, never the owning
+    // overlay of an application rendered beneath them.
+    if (parent.matches?.("body, html, #interface, #board, #hud, #sidebar, #scene-controls, #scene-navigation, #hotbar")) break;
+    if (isPersistentOverlay(parent)) return true;
+  }
+  return false;
+}
+
+// Recognize an actual persistent Actor sheet from its application role and capabilities.
+function actorSheetApplication(application) {
+  if (!application) return false;
+  // Ownership/configuration forms can also own an Actor document. Only the
+  // native sheet hierarchy identifies the persistent presentation VE replaces.
+  const types = [globalThis.foundry?.applications?.sheets?.ActorSheetV2, globalThis.foundry?.appv1?.sheets?.ActorSheet];
+  return types.some(type => typeof type === "function" && application instanceof type);
+}
+
+function desktopSidebarApplication(application, element) {
+  // Collection directories remain persistent desktop workspaces. A framed,
+  // separately rendered sidebar popout is an intentional native interaction
+  // (for example, a filtered Chat view), even when it inherits SidebarTab.
+  // The caller still enforces lifecycle ownership and activation-baseline rules.
+  if (element.matches(".directory, .directory-popout")) return true;
+  if (application && element.matches(".sidebar-popout") && element.querySelector?.(".window-header")) return false;
+  const types = [globalThis.foundry?.applications?.sidebar?.SidebarTab, globalThis.foundry?.appv1?.sidebar?.SidebarTab];
+  return element.matches(".sidebar-tab, .sidebar-popout, .directory-popout")
+    || types.some(type => typeof type === "function" && application instanceof type);
+}
+
+/** Capture optional interaction provenance for support diagnostics. Admission
+ * never depends on this short-lived correlation. */
+export function interactionStartsApplicationLineage(event) {
+  return Boolean(applicationInteractionOrigin(event));
+}
+
+/** A shared, conservative definition of activation which can create native UI. */
+export function deliberateApplicationControl(event) {
+  const target = event?.target;
+  if (!target?.closest) return null;
+  if (event.isTrusted === false) return null;
+  if (event.type === "pointerdown" && (event.button != null && event.button !== 0 || event.isPrimary === false)) return null;
+  if (event.type === "click" && event.button != null && event.button !== 0) return null;
+  if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return null;
+  if (!["pointerdown", "click", "keydown", "submit"].includes(event.type)) return null;
+  if (target.closest("[data-action='close'], .header-button.close, .window-header .close")) return null;
+  const control = event.type === "submit" ? target.closest("form") : target.closest(APPLICATION_CONTROL_SELECTOR);
+  if (!control || control.disabled === true || control.getAttribute?.("aria-disabled") === "true") return null;
+  return control;
+}
+
+/** Resolve the nearest actionable origin so admission follows the user's actual
+ * click/keyboard path rather than any recent activity on the page. */
+export function applicationInteractionOrigin(event) {
+  const control = deliberateApplicationControl(event);
+  if (!control) return null;
+  // Native Settings has its own explicit session and child-window owner. Do
+  // not let the generic policy apply a second, competing admission class.
+  if (event.target.closest(".ve-mobile-settings-app")) return null;
+  const root = event.target.closest(APPLICATION_ORIGIN_SELECTOR);
+  if (!root) return null;
+  return Object.freeze({ root, control, source: interactionSource(root), controlName: interactionControlName(control) });
+}
+
+/** Correlate at most one render with a deliberate control for diagnostics.
+ * Later asynchronous renders remain eligible for generic admission. */
+export function createUserInteractionLineage({
+  now = () => Date.now(),
+  durationMs = APPLICATION_LINEAGE_MS,
+  schedule = (callback, delay) => setTimeout(callback, delay),
+  cancel = (id) => clearTimeout(id),
+  trace = () => {}
+} = {}) {
+  let generation = 0;
+  let active = null;
+  let timer = null;
+  let lastClaim = null;
+  let claimTimer = null;
+  // Cancel an expiry timer owned by an application admission record.
+  const clearTimer = () => {
+    if (timer === null) return;
+    cancel(timer);
+    timer = null;
+  };
+  // Release a temporary application admission claim and its presentation markers.
+  const clearClaim = () => {
+    if (claimTimer !== null) cancel(claimTimer);
+    claimTimer = null;
+    lastClaim = null;
+  };
+  // End an admission claim when its bounded intent window has elapsed.
+  const expire = (reason) => {
+    if (!active) return;
+    trace({ type: "user-interaction-lineage", result: reason, generation: active.generation, source: active.source, control: active.controlName });
+    active = null;
+    clearTimer();
+  };
+  // Capture the application properties the presentation patch may need to restore.
+  const snapshot = (record) => record ? Object.freeze({
+    generation: record.generation,
+    source: record.source,
+    control: record.controlName,
+    startedAt: record.startedAt,
+    expiresAt: record.expiresAt
+  }) : null;
+  return Object.freeze({
+    // Capture the opener lineage for a native interaction that may render its application later.
+    begin(event) {
+      const origin = applicationInteractionOrigin(event);
+      if (!origin) return null;
+      const time = now();
+      if (!active && event.type === "click" && lastClaim?.control === origin.control && lastClaim.root === origin.root) return null;
+      if (active && active.control === origin.control && active.root === origin.root && time <= active.expiresAt) {
+        return snapshot(active);
+      }
+      expire("superseded");
+      active = {
+        generation: ++generation,
+        source: origin.source,
+        controlName: origin.controlName,
+        control: origin.control,
+        root: origin.root,
+        startedAt: time,
+        expiresAt: time + durationMs
+      };
+      trace({ type: "user-interaction-lineage", result: "started", generation, source: active.source, control: active.controlName });
+      clearTimer();
+      const expected = active;
+      timer = schedule(() => {
+        timer = null;
+        if (active === expected) expire("expired");
+      }, durationMs);
+      return snapshot(active);
+    },
+    // Find the unclaimed opener lineage that matches the application currently being rendered.
+    match() {
+      if (!active) return null;
+      if (now() > active.expiresAt) {
+        expire("expired");
+        return null;
+      }
+      return snapshot(active);
+    },
+    // Mark a matching opener lineage as claimed so one native application cannot consume it twice.
+    claim(application, element) {
+      if (!active) return null;
+      const matched = snapshot(active);
+      clearClaim();
+      lastClaim = { control: active.control, root: active.root };
+      const expectedClaim = lastClaim;
+      claimTimer = schedule(() => {
+        claimTimer = null;
+        if (lastClaim === expectedClaim) lastClaim = null;
+      }, Math.min(500, durationMs));
+      trace({
+        type: "user-interaction-lineage",
+        result: "correlated",
+        generation: active.generation,
+        source: active.source,
+        control: active.controlName,
+        application: applicationIdentity(application, element)
+      });
+      active = null;
+      clearTimer();
+      return matched;
+    },
+    dispose() { expire("disposed"); clearClaim(); },
+    state() { return Object.freeze({ generation, active: Boolean(active), lineage: snapshot(active) }); }
+  });
+}
+
+/** Prefer stable Foundry Application identity and use its root only as fallback. */
+export function applicationIdentity(application, element = applicationElement(application)) {
+  const parent = application?.parent ?? application?.options?.parent ?? null;
+  return Object.freeze({
+    class: String(application?.constructor?.name ?? "DOMApplication").slice(0, 80),
+    appId: String(application?.appId ?? application?.id ?? application?.options?.id ?? element?.dataset?.appid ?? element?.id ?? "unknown").slice(0, 120),
+    rootId: String(element?.id ?? "").slice(0, 120),
+    parentAppId: parent ? String(parent.appId ?? parent.id ?? parent.options?.id ?? "unknown").slice(0, 120) : null
+  });
+}
+
+// Record bounded diagnostic details for the application classification decision.
+function traceApplication(trace, result, application, element, lineage, classification, timestamp, body, baseline = false) {
+  trace({
+    type: "application-render",
+    ...applicationIdentity(application, element),
+    owner: String(application?.constructor?.metadata?.module ?? element?.dataset?.moduleId ?? "unknown").slice(0, 80),
+    baseline,
+    renderedAt: timestamp,
+    mode: body?.dataset?.veMobileFormFactor ?? (body?.classList?.contains?.("ve-mobile-split-screen") ? "tablet-split" : "mobile"),
+    lineage: lineage?.generation ?? null,
+    classification: classification?.reason ?? "unknown",
+    result: String(result).toUpperCase()
+  });
+}
+
+// Resolve which native control or interaction opened the application.
+function interactionSource(root) {
+  if (root?.matches?.("#hud.ve-mobile-native-hud-host")) return "native HUD";
+  if (root?.matches?.(".ve-mobile-module-overlay-visible")) return "admitted Scene overlay";
+  if (root?.matches?.(".ve-mobile-transient-app, .ve-mobile-dialog")) return "admitted transient application";
+  if (root?.matches?.("#context-menu, #prosemirror-dropdown")) return "admitted native control";
+  if (root?.matches?.(".ve-mobile-bootstrap")) return "VE bootstrap";
+  return "Mobile Deck";
+}
+
+// Read the semantic name of the initiating control for classification diagnostics.
+function interactionControlName(control) {
+  return String(control?.dataset?.action
+    ?? control?.getAttribute?.("aria-label")
+    ?? control?.getAttribute?.("data-tooltip")
+    ?? control?.name
+    ?? control?.id
+    ?? control?.tagName
+    ?? "control").slice(0, 120);
+}
+
+// Resolve the live root element of a Foundry application instance.
+function applicationElement(application, rendered) {
+  const candidates = [rendered, rendered?.[0], application?.element, application?.element?.[0]];
+  const candidate = candidates.find(candidate => candidate?.nodeType === 1 && candidate.isConnected !== false)
+    ?? candidates.find(candidate => candidate?.nodeType === 1) ?? null;
+  return nativeApplicationRoot(candidate);
+}
+
+/** Foundry sheets may expose their inner form as Application.element while the
+ * actual window shell owns sizing, stacking, and the window lifecycle classes. */
+function nativeApplicationRoot(element) {
+  if (!element) return null;
+  let applicationRoot = null;
+  for (let current = element; current; current = current.parentElement) {
+    if (current.matches?.(".app.window-app")) return current;
+    if (!applicationRoot && current.matches?.(".application")) applicationRoot = current;
+  }
+  return applicationRoot ?? element;
+}
+
+// Read application instances from the supported Foundry registry shape.
+function registryValues(registry) {
+  if (!registry) return [];
+  if (typeof registry.values === "function") return [...registry.values()];
+  return Object.values(registry);
+}
+
+// Filter future Foundry resolution warnings only while mobile presentation is active, retaining the original reporting path.
+function suppressFutureResolutionWarnings(scope) {
+  const notifications = globalThis.ui?.notifications;
+  if (!notifications || typeof notifications.error !== "function") return;
+
+  const original = notifications.error;
+  // Pass unrelated Foundry errors through unchanged and handle only the targeted resolution warning.
+  const filteredError = function (message, options) {
+    if (RESOLUTION_MESSAGE_KEYS.has(message)) return null;
+    return original.call(this, message, options);
+  };
+
+  notifications.error = filteredError;
+  scope.own(() => {
+    if (notifications.error === filteredError) notifications.error = original;
+  });
+}
+
+// Match the desktop minimum-resolution warning using its known Foundry message shape.
+function isResolutionWarning(text) {
+  const normalized = normalize(text);
+  if (!normalized) return false;
+
+  for (const key of RESOLUTION_MESSAGE_KEYS) {
+    const template = globalThis.game?.i18n?.localize?.(key);
+    if (!template || template === key) continue;
+    if (templatePattern(template).test(normalized)) return true;
+  }
+  return false;
+}
+
+// Build a matcher for the supported warning template without treating its placeholders as literal text.
+function templatePattern(template) {
+  const parts = normalize(template).split(/\{[^}]+\}/u).map(escapePattern);
+  return new RegExp(`^${parts.join(".*?")}$`, "u");
+}
+
+// Normalize warning text before comparing it with the known Foundry resolution message.
+function normalize(value) {
+  return String(value ?? "").replace(/\s+/gu, " ").trim();
+}
+
+// Escape literal template text before constructing the warning matcher.
+function escapePattern(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}

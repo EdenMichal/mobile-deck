@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node --test tests/*.test.mjs
+
+      - name: Syntax check the Foundry e2e suites (they need a live Foundry, so they aren't run)
+        run: for f in tests/foundry/*.mjs; do node --check "$f"; done

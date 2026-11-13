@@ -1,0 +1,1188 @@
+import { localizeFoundry } from "./localization.mjs";
+import { KEYS, MODULE_ID } from "./preferences.mjs";
+import { enableModuleOverlayTouch } from "../ui/module-overlay-touch.mjs";
+
+const VISIBLE_CLASS = "ve-mobile-module-overlay-visible";
+const HOST_CLASS = "ve-mobile-module-overlay-host";
+const HIDDEN_CLASS = "ve-mobile-module-overlay-hidden";
+const MAX_SCAN_ELEMENTS = 768;
+const MAX_SCAN_DEPTH = 8;
+const MAX_SCAN_LOG_ENTRIES = 128;
+const MAX_OWNERSHIP_DESCENDANTS = 64;
+const CORE_ROOT_IDS = new Set([
+  "board", "interface", "notifications", "tooltip", "context-menu", "pause", "players", "sidebar", "menu", "hud",
+  "scene-controls", "scene-navigation", "hotbar", "camera-views", "ui-left", "ui-right", "ui-left-column-1",
+  "ui-left-column-2", "ui-right-column-1", "ui-right-column-2"
+]);
+const OVERLAY_WORDS = /(?:^|[-_\s])(overlay|widget|toolbar|bar|dock|docked|panel|calendar|weather|party|token|canvas|hud|video|player)(?:$|[-_\s])/iu;
+const SCAN_ROOT_IDS = Object.freeze(["interface", "ui-left", "ui-right", "ui-left-column-1", "ui-left-column-2", "ui-right-column-1", "ui-right-column-2", "hud"]);
+const MODULE_OVERLAY_ADAPTERS = Object.freeze({
+  "smalltime": Object.freeze([
+    // SmallTime's persistent clock renders as a form after canvasReady. Its
+    // native Application lifecycle must not bypass the overlay visibility flag.
+    Object.freeze({ rootId: "smalltime-app", overlayName: "Clock", evidence: "verified persistent clock ApplicationV2 form root", catalogWhenAbsent: true })
+  ]),
+  "foundryvtt-simple-calendar": Object.freeze([
+    Object.freeze({ rootId: "fsc-if", overlayName: "Calendar", evidence: "verified persistent FormApplication root", catalogWhenAbsent: true })
+  ]),
+  "monks-tokenbar": Object.freeze([
+    Object.freeze({ rootId: "tokenbar", overlayName: "Token Bar", evidence: "verified non-dismissible ApplicationV2 root", catalogWhenAbsent: true })
+  ]),
+  "your-turn": Object.freeze([
+    Object.freeze({ rootId: "yourTurnContainer", overlayName: "Turn Banner", evidence: "verified combat-turn body overlay root", catalogWhenAbsent: true })
+  ]),
+  "combat-tracker-dock": Object.freeze([
+    Object.freeze({ rootId: "combat-dock", overlayName: "Combat Carousel", evidence: "verified encounter-scoped ApplicationV2 dock root", catalogWhenAbsent: true })
+  ]),
+  "dfreds-effects-panel": Object.freeze([
+    // DFreds computes an absolute left coordinate from the desktop sidebar.
+    // Its mobile presentation must instead retain its intended right edge.
+    Object.freeze({ rootId: "effects-panel", overlayName: "Effects Panel", evidence: "verified selected-token frameless ApplicationV2 root", catalogWhenAbsent: true, sceneEdge: "right" })
+  ]),
+  "fvtt-youtube-player": Object.freeze([
+    // SidebarVideoPlayer keeps this ID when detached from the desktop controls.
+    Object.freeze({ rootId: "sidebar-video-player", overlayName: "Sidebar Video Player", evidence: "verified docked and detached SidebarVideoPlayer root", catalogWhenAbsent: true })
+  ])
+});
+
+/** User-initiated discovery and exact reconciliation of known module overlays. */
+export function createModuleOverlayGateway({
+  getGame = () => globalThis.game,
+  getDocument = () => globalThis.document,
+  getFoundry = () => globalThis.foundry,
+  getUi = () => globalThis.ui,
+  enableTouch = enableModuleOverlayTouch,
+  diagnostics = null,
+  performanceObserver = null
+} = {}) {
+  let owner = null;
+  let context = Object.freeze({ route: "characters", splitScreen: false, templatePlacement: false, sceneChooserOpen: false, reconnecting: false });
+  const adapters = new Map();
+  const markedRoots = new Set();
+  const markedHosts = new Set();
+  const hiddenRoots = new Set();
+  let reconcileApplications = null;
+  let knownRootIds = new Set();
+  let knownRootSelector = "";
+  const lastSceneRuntime = new Map();
+  let lastScanDiagnostics = Object.freeze([]);
+  let lastContextKey = "";
+  let lastReconcileKey = "";
+  let lastVisible = Object.freeze([]);
+
+  // Remove the gateway’s current overlay presentation and release resources owned by the previous reconciliation.
+  const clearPresentation = () => {
+    for (const adapter of adapters.values()) adapter.scope.dispose();
+    adapters.clear();
+    for (const element of markedRoots) element?.classList?.remove?.(VISIBLE_CLASS);
+    for (const element of markedHosts) element?.classList?.remove?.(HOST_CLASS);
+    for (const element of hiddenRoots) element?.classList?.remove?.(HIDDEN_CLASS);
+    markedRoots.clear();
+    markedHosts.clear();
+    hiddenRoots.clear();
+    knownRootIds.clear();
+    knownRootSelector = "";
+    lastContextKey = "";
+    lastReconcileKey = "";
+    lastVisible = Object.freeze([]);
+  };
+
+  // Read and normalize the saved module-overlay catalogue.
+  const readCatalog = () => normalizeCatalog(readSetting(getGame(), KEYS.MODULE_OVERLAY_CATALOG));
+  // Read the current module visibility choices.
+  const readVisibility = () => normalizeVisibility(readSetting(getGame(), KEYS.MODULE_OVERLAY_VISIBILITY));
+  // Read the preferred module-overlay ordering.
+  const readOrder = () => normalizeOrder(readSetting(getGame(), KEYS.MODULE_OVERLAY_ORDER));
+  // Read the saved overlay scale overrides.
+  const readScale = () => normalizeScaleRecord(readSetting(getGame(), KEYS.MODULE_OVERLAY_SCALE));
+  // Apply saved visibility, scale, and ordering to the discovered overlay records.
+  const orderedEntries = () => orderOverlayEntries(readCatalog().entries, readOrder());
+  // Classify an element as a persistent desktop overlay only when its structure and owning module support that role.
+  const isPersistentRoot = (root, application = null) => {
+    const rootId = stableRootId(root);
+    const formWorkflow = root?.matches?.("form") || root?.querySelector?.("form")?.matches?.("form");
+    const applicationIdentity = [application?.id, application?.options?.id,
+      ...(Array.isArray(application?.options?.classes) ? application.options.classes : [])].filter(Boolean).join(" ");
+    if (isSceneTabSurface(root) || SCENE_TAB_IDENTITY.test(applicationIdentity)
+      || ((isCarolingianSurface(root) || /(?:^|[-_\s])crlngn[-_]/iu.test(applicationIdentity)) && !formWorkflow)) return true;
+    const game = getGame();
+    const document = getDocument();
+    if (rootId && game?.modules) {
+      for (const module of registryValues(game.modules)) {
+        if (module?.active && adapterFor(module, rootId)) return true;
+      }
+      const entry = readCatalog().entries.find((candidate) => candidate.rootId === rootId);
+      const module = entry ? game.modules.get?.(entry.moduleId) : null;
+      if (entry && module?.active && safeKnownRoot(root, module, document, entry)) return true;
+    }
+    // Only exact adapter/catalogue identities override a genuine modal role.
+    // Frameless configuration and action dialogs remain native workflows.
+    if (application?.options?.modal === true || root?.matches?.("dialog, [role='dialog'], .dialog, .activity-choice, .activity-usage, .roll-configuration, .midi-targeting, #midi-qol-targetConfirmation")) return false;
+    // A just-created persistent Application may render before the catalog has
+    // had an opportunity to discover it. Preserve the same structural boundary
+    // used by discovery without treating an ordinary framed form as an overlay.
+    const frameLess = application?.options?.window?.frame === false
+      || application?.options?.window?.positioned === false
+      || application?.options?.popOut === false;
+    const identity = `${root?.id ?? ""} ${typeof root?.className === "string" ? root.className : ""}`;
+    return Boolean((frameLess && !formWorkflow)
+      || (OVERLAY_WORDS.test(identity) && (explicitOverlayStructure(root) || application?.nonDismissible === true)));
+  };
+
+  // Rebuild overlay discovery and presentation for the current route and viewport, replacing stale nodes and ownership.
+  const reconcile = (nextContext = context, { force = false } = {}) => {
+    performanceObserver?.increment?.("overlay.reconcile.requested");
+    context = Object.freeze({ ...context, ...nextContext });
+    const contextKey = JSON.stringify(context);
+    if (!force && contextKey === lastContextKey) {
+      performanceObserver?.increment?.("overlay.reconcile.deduplicated");
+      return Object.freeze({ visible: lastVisible });
+    }
+    const sceneVisible = context.route === "scene" || context.splitScreen === true;
+    const mayShow = sceneVisible && !context.templatePlacement && !context.reconnecting;
+    const game = getGame();
+    const document = getDocument();
+    const visibility = readVisibility();
+    const scales = readScale();
+    const entries = orderedEntries();
+    const reconcileKey = JSON.stringify({ context, visibility, scales, entries: entries.map((entry) => entry.id) });
+    if (!force && reconcileKey === lastReconcileKey) {
+      lastContextKey = contextKey;
+      performanceObserver?.increment?.("overlay.reconcile.deduplicated");
+      return Object.freeze({ visible: lastVisible });
+    }
+    performanceObserver?.increment?.("overlay.reconcile.applied");
+    // A scan can transfer a previously admitted Application to overlay policy.
+    // Release its admission through the owner, including backdrop/layer state.
+    reconcileApplications?.();
+    const desired = new Map();
+    const known = new Map();
+    const policyEntries = entries.filter(entry => game?.modules?.get?.(entry.moduleId)?.active);
+    for (const [moduleId, definitions] of Object.entries(MODULE_OVERLAY_ADAPTERS)) {
+      if (!game?.modules?.get?.(moduleId)?.active) continue;
+      for (const definition of definitions) policyEntries.push({ moduleId, rootId: definition.rootId, id: `${moduleId}:${semanticSlug(definition.rootId)}` });
+    }
+    knownRootIds = new Set(policyEntries.map(entry => entry.rootId).filter(id => stableRootId({ id })));
+    knownRootSelector = [...knownRootIds].map(id => `[id="${id}"]`).join(",");
+    for (const entry of policyEntries) {
+      const module = game?.modules?.get?.(entry.moduleId);
+      const root = document?.getElementById?.(entry.rootId);
+      if (module?.active && root?.isConnected !== false && root && safeKnownRoot(root, module, document, entry)) known.set(root, entry);
+    }
+    if (mayShow) {
+      for (const entry of entries) {
+        if (!visibility[entry.id]) continue;
+        const module = game?.modules?.get?.(entry.moduleId);
+        if (!module?.active) continue;
+        const root = document?.getElementById?.(entry.rootId);
+        if (!root || root.isConnected === false || !safeKnownRoot(root, module, document, entry)) continue;
+        desired.set(root, entry);
+      }
+    }
+
+    for (const [root, adapter] of [...adapters]) {
+      if (desired.has(root)) continue;
+      adapter.scope.dispose();
+      adapters.delete(root);
+    }
+    for (const element of markedRoots) element?.classList?.remove?.(VISIBLE_CLASS);
+    for (const element of markedHosts) element?.classList?.remove?.(HOST_CLASS);
+    markedRoots.clear();
+    markedHosts.clear();
+    for (const root of hiddenRoots) if (!known.has(root) || desired.has(root)) root.classList.remove(HIDDEN_CLASS);
+    hiddenRoots.clear();
+    for (const root of known.keys()) {
+      if (desired.has(root)) continue;
+      root.classList.add(HIDDEN_CLASS);
+      hiddenRoots.add(root);
+    }
+
+    let overlayOrder = 0;
+    for (const [root, entry] of desired) {
+      root.classList.add(VISIBLE_CLASS);
+      markedRoots.add(root);
+      for (const host of overlayHosts(root, document)) {
+        host.classList.add(HOST_CLASS);
+        markedHosts.add(host);
+      }
+      if (!adapters.has(root) && owner) {
+        const adapterScope = owner.child(`module-overlay:${entry.id}`);
+        const definition = adapterFor(game.modules?.get?.(entry.moduleId), entry.rootId);
+        const dragStrategy = classifyOverlayInteraction(root);
+        const application = applicationForElement(root, getFoundry(), getUi());
+        const moveWindow = dragStrategy === "pointer-root"
+          ? createApplicationWindowMover(application, root) ?? createPositionedElementMover(root)
+          : null;
+        const controller = enableTouch(root, adapterScope, {
+          dragStrategy,
+          moveWindow,
+          trace: dragStrategy !== "mouse-target"
+            ? (event) => diagnostics?.record?.("debug", `Overlay touch ${entry.id} | ${formatTouchTrace(event)}`)
+            : undefined
+        });
+        const presentation = createSceneBoundPresentation(root, definition, adapterScope, application);
+        adapters.set(root, { scope: adapterScope, controller, presentation });
+        watchRootRemoval(root, adapterScope, () => reconcile(context, { force: true }));
+      }
+      adapters.get(root)?.presentation?.update?.(context.viewport, 127 - overlayOrder++, scales[entry.id] ?? 100);
+    }
+    if (mayShow) {
+      for (const entry of entries) {
+        if (!visibility[entry.id] || !game?.modules?.get?.(entry.moduleId)?.active) continue;
+        lastSceneRuntime.set(entry.id, Object.freeze({
+          ...inspectOverlayRuntime(entry, document, adapters, context.viewport, "scene")
+        }));
+      }
+    }
+    lastReconcileKey = reconcileKey;
+    lastContextKey = contextKey;
+    lastVisible = Object.freeze([...desired.values()].map((entry) => entry.id));
+    return Object.freeze({ visible: lastVisible });
+  };
+
+  return Object.freeze({
+    // Install overlay discovery, persistence listeners, and deterministic presentation cleanup in this scope.
+    enable(scope, { reconcileApplications: reconcileNativeApplications = null } = {}) {
+      if (owner === scope) return;
+      owner = scope;
+      reconcileApplications = reconcileNativeApplications;
+      // Refresh known roots after relevant Foundry/module changes.
+      const refreshKnown = () => reconcile(context, { force: true });
+      // Schedule a known-root refresh after the current Foundry render hook completes.
+      const refreshKnownAfterHook = () => queueMicrotask(() => {
+        if (owner === scope && !scope.disposed) refreshKnown();
+      });
+      scope.hook?.("renderApplication", refreshKnown);
+      scope.hook?.("renderApplicationV2", refreshKnown);
+      scope.hook?.("closeApplication", refreshKnown);
+      scope.hook?.("closeApplicationV2", refreshKnown);
+      scope.hook?.("canvasReady", refreshKnown);
+      scope.hook?.("createCombat", refreshKnownAfterHook);
+      scope.hook?.("updateCombat", refreshKnownAfterHook);
+      scope.hook?.("deleteCombat", refreshKnownAfterHook);
+      // Observe only insertion/removal of exact known roots. No discovery or
+      // full DOM scan runs during normal rendering, input, or idle frames.
+      const Observer = getDocument()?.defaultView?.MutationObserver ?? globalThis.MutationObserver;
+      let queued = false;
+      const observer = Observer && getDocument()?.body ? new Observer(mutations => {
+        if (queued || !knownRootSelector) return;
+        const changed = mutations.some(mutation => !mutation.target?.closest?.(".ve-mobile-app, .ve-mobile-bootstrap")
+          && [...mutation.addedNodes, ...mutation.removedNodes].some(node =>
+          node?.nodeType === 1 && !node.matches?.(".ve-mobile-app, .ve-mobile-bootstrap")
+          && (knownRootIds.has(node.id) || node.querySelector?.(knownRootSelector))));
+        if (!changed) return;
+        queued = true;
+        queueMicrotask(() => {
+          queued = false;
+          if (owner === scope && !scope.disposed) refreshKnown();
+        });
+      }) : null;
+      scope.own(() => observer?.disconnect());
+      observer?.observe(getDocument().body, { childList: true, subtree: true });
+      scope.own(() => {
+        if (owner !== scope) return;
+        clearPresentation();
+        reconcileApplications = null;
+        owner = null;
+      });
+      refreshKnown();
+    },
+
+    // Return the current accepted overlay records and ownership diagnostics as immutable data.
+    snapshot() {
+      const catalog = readCatalog();
+      const visibility = readVisibility();
+      const scales = readScale();
+      const activeModules = getGame()?.modules;
+      return Object.freeze({
+        scanned: catalog.scanned,
+        entries: Object.freeze(orderOverlayEntries(catalog.entries, readOrder()).map((entry) => Object.freeze({
+          ...entry,
+          available: Boolean(activeModules?.get?.(entry.moduleId)?.active),
+          visible: Boolean(visibility[entry.id]),
+          scale: scales[entry.id] ?? 100
+        })))
+      });
+    },
+
+    // Re-scan current module roots and publish the overlays that pass ownership and role checks.
+    async scan() {
+      const game = getGame();
+      if (!game?.settings?.set) throw new Error(localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.FoundryClientSettingsAreUnavailable", "Foundry client settings are unavailable."));
+      const discovery = inspectModuleOverlays({
+        document: getDocument(),
+        modules: game.modules,
+        foundry: getFoundry(),
+        ui: getUi()
+      });
+      const entries = discovery.entries;
+      lastScanDiagnostics = discovery.diagnostics;
+      for (const candidate of discovery.diagnostics.slice(0, MAX_SCAN_LOG_ENTRIES)) {
+        diagnostics?.record?.("debug", formatScanDiagnostic(candidate));
+      }
+      diagnostics?.record?.("debug", `Module Overlay Scan | candidates=${discovery.diagnostics.length} accepted=${entries.length}${discovery.diagnostics.length > MAX_SCAN_LOG_ENTRIES ? ` logged=${MAX_SCAN_LOG_ENTRIES}` : ""}`);
+      await game.settings.set(MODULE_ID, KEYS.MODULE_OVERLAY_CATALOG, { scanned: true, entries });
+      await game.settings.set(MODULE_ID, KEYS.MODULE_OVERLAY_ORDER, orderOverlayEntries(entries, readOrder()).map((entry) => entry.id));
+      reconcile(context, { force: true });
+      return this.snapshot();
+    },
+
+    scanDiagnostics: () => lastScanDiagnostics,
+    isPersistentRoot,
+
+    // Return the detailed scan decisions used to explain accepted, rejected, or ambiguous roots.
+    diagnosticSnapshot() {
+      const document = getDocument();
+      const game = getGame();
+      const visibility = readVisibility();
+      return Object.freeze(readCatalog().entries
+        .filter((entry) => visibility[entry.id] && game?.modules?.get?.(entry.moduleId)?.active)
+        .map((entry) => lastSceneRuntime.get(entry.id) ?? Object.freeze({
+          ...inspectOverlayRuntime(entry, document, adapters, context.viewport, "current")
+        })));
+    },
+
+    // Persist one overlay's visibility choice and reconcile its current presentation.
+    async setVisible(id, visible) {
+      const game = getGame();
+      const catalog = readCatalog();
+      const entry = catalog.entries.find((candidate) => candidate.id === id);
+      if (!entry) throw new Error(localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.ThatModuleOverlayIsNoLongerInTheDiscovered", "That module overlay is no longer in the discovered catalog."));
+      if (visible && !game?.modules?.get?.(entry.moduleId)?.active) throw new Error(localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.ThatModuleIsNotActiveInThisWorld", "That module is not active in this world."));
+      const next = { ...readVisibility() };
+      if (visible) next[id] = true;
+      else delete next[id];
+      await game.settings.set(MODULE_ID, KEYS.MODULE_OVERLAY_VISIBILITY, next);
+      reconcile(context, { force: true });
+      return Object.freeze({ ok: true, id, visible: Boolean(next[id]) });
+    },
+
+    // Save the requested overlay order after validating it against the current overlay set.
+    async setOrder(ids) {
+      const game = getGame();
+      const catalogIds = readCatalog().entries.map((entry) => entry.id);
+      const requested = normalizeOrder(ids);
+      if (requested.length !== catalogIds.length || catalogIds.some((id) => !requested.includes(id))) {
+        throw new Error(localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.TheModuleOverlayListChangedRefreshSettingsAndTry", "The module overlay list changed. Refresh Settings and try again."));
+      }
+      await game.settings.set(MODULE_ID, KEYS.MODULE_OVERLAY_ORDER, requested);
+      reconcile(context, { force: true });
+      return this.snapshot();
+    },
+
+    // Save one overlay's scale preference and apply it through the owned style adapter.
+    async setScale(id, scale) {
+      const game = getGame();
+      if (!readCatalog().entries.some((entry) => entry.id === id)) {
+        throw new Error(localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.ThatModuleOverlayIsNoLongerInTheDiscovered", "That module overlay is no longer in the discovered catalog."));
+      }
+      const value = normalizeOverlayScale(scale);
+      const next = { ...readScale() };
+      if (value === 100) delete next[id];
+      else next[id] = value;
+      await game.settings.set(MODULE_ID, KEYS.MODULE_OVERLAY_SCALE, next);
+      reconcile(context, { force: true });
+      return this.snapshot();
+    },
+
+    reconcile,
+    // Cancel gestures owned by overlays before the next reconciliation moves their controls.
+    cancelInteractions() {
+      for (const adapter of adapters.values()) adapter.scope.dispose();
+      adapters.clear();
+    },
+    clear: clearPresentation
+  });
+}
+
+/** Scan bounded Foundry roots for user-visible module overlays. */
+export function discoverModuleOverlays(options = {}) {
+  return inspectModuleOverlays(options).entries;
+}
+
+/** Detailed output is retained for deterministic development diagnostics only. */
+export function inspectModuleOverlays({ document, modules, foundry, ui } = {}) {
+  if (!document?.body) return Object.freeze({ entries: Object.freeze([]), diagnostics: Object.freeze([]) });
+  const activeModules = [...registryValues(modules)].filter((module) => module?.active && module.id && module.id !== MODULE_ID && !isBlockedOverlayModule(module));
+  if (!activeModules.length) return Object.freeze({ entries: Object.freeze([]), diagnostics: Object.freeze([]) });
+  const appOwnership = applicationOwnership(activeModules, foundry, ui);
+  const candidates = boundedCandidates(document, appOwnership);
+  const found = new Map();
+  const diagnostics = [];
+  // Record a bounded diagnostic note for the current overlay reconciliation.
+  const note = (element, outcome, reason, extra = {}) => diagnostics.push(Object.freeze({
+    rootId: stableRootId(element) || "(unstable root)", outcome, reason, ...extra
+  }));
+
+  for (const element of candidates) {
+    const rootId = stableRootId(element);
+    if (!rootId) {
+      note(element, "rejected", "root has no stable ID");
+      continue;
+    }
+    if (isSceneTabSurface(element)) {
+      note(element, "rejected", "Scene tabs are replaced by Mobile Deck navigation");
+      continue;
+    }
+    const claimedCoreAdapter = activeModules.some((module) => Boolean(adapterFor(module, rootId)));
+    if (CORE_ROOT_IDS.has(rootId) && !claimedCoreAdapter) {
+      note(element, "rejected", "core Foundry root");
+      continue;
+    }
+    if (excludedElement(element)) {
+      note(element, "rejected", "Mobile Deck-owned or non-overlay infrastructure root");
+      continue;
+    }
+    if (element?.isConnected === false || (!document.body.contains?.(element) && element !== document.body)) {
+      note(element, "rejected", "application root is not connected to the current document");
+      continue;
+    }
+    const application = appOwnership.get(element);
+    const ownership = application?.ownership ?? identifyModuleOwnership(element, activeModules);
+    if (ownership.status === "ambiguous") {
+      note(element, "ambiguous", ownership.reason, { moduleIds: Object.freeze(ownership.modules.map((module) => module.id)) });
+      continue;
+    }
+    if (ownership.status !== "owned") {
+      note(element, "rejected", ownership.reason);
+      continue;
+    }
+    const role = overlayRole(element, application, ownership.adapter, document);
+    if (!role.accepted) {
+      note(element, "rejected", role.reason, { moduleId: ownership.module.id });
+      continue;
+    }
+    const id = `${ownership.module.id}:${semanticSlug(rootId)}`;
+    if (found.has(id)) {
+      note(element, "rejected", "duplicate overlay identity", { moduleId: ownership.module.id });
+      continue;
+    }
+    found.set(id, Object.freeze({
+      id,
+      moduleId: String(ownership.module.id),
+      moduleTitle: String(ownership.module.title ?? ownership.module.id),
+      overlayName: friendlyOverlayName(element, ownership.module, ownership.adapter),
+      rootId
+    }));
+    note(element, "accepted", `${ownership.reason}; ${role.reason}`, {
+      moduleId: ownership.module.id,
+      owner: ownership.module.id,
+      source: application ? "application" : ownership.adapter ? "adapter" : "dom",
+      connected: true,
+      classification: ownership.adapter?.classification ?? "overlay"
+    });
+  }
+  for (const module of activeModules) {
+    for (const adapter of MODULE_OVERLAY_ADAPTERS[module.id] ?? []) {
+      if (!adapter.catalogWhenAbsent) continue;
+      const id = `${module.id}:${semanticSlug(adapter.rootId)}`;
+      if (found.has(id)) continue;
+      found.set(id, Object.freeze({
+        id,
+        moduleId: String(module.id),
+        moduleTitle: String(module.title ?? module.id),
+        overlayName: adapter.overlayName,
+        rootId: adapter.rootId
+      }));
+      diagnostics.push(Object.freeze({
+        rootId: adapter.rootId,
+        outcome: "accepted",
+        reason: localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.VerifiedConditionalRootIsNotCurrentlyConnected", "{evidence}; verified conditional root is not currently connected", { evidence: (adapter.evidence) }),
+        moduleId: module.id,
+        owner: module.id,
+        source: "adapter",
+        connected: false,
+        classification: adapter.classification ?? "overlay"
+      }));
+    }
+  }
+  const entries = Object.freeze([...found.values()].sort((a, b) => a.moduleTitle.localeCompare(b.moduleTitle) || a.overlayName.localeCompare(b.overlayName)));
+  return Object.freeze({ entries, diagnostics: Object.freeze(diagnostics) });
+}
+
+// Determine whether an application instance and element still belong to the current Foundry/module owner.
+function applicationOwnership(modules, foundry, ui) {
+  const result = new Map();
+  const applications = uniqueValues([
+    ...registryValues(foundry?.applications?.instances),
+    ...Object.values(ui?.windows ?? {}),
+    ui?.activeWindow
+  ]);
+  for (const app of applications) {
+    const element = applicationElement(app);
+    if (!element) continue;
+    const metadata = {
+      id: [app?.id, app?.options?.id, ...(app?.options?.classes ?? []), app?.constructor?.name].filter(Boolean).join(" "),
+      className: typeof element?.className === "string" ? element.className : "",
+      dataset: element?.dataset ?? {},
+      ownershipFragments: explicitOverlayStructure(element) ? ownershipIdentities(element) : []
+    };
+    const ownership = identifyModuleOwnership(metadata, modules, stableRootId(element));
+    result.set(element, Object.freeze({ app, ownership }));
+  }
+  return result;
+}
+
+// Find the live Foundry application associated with an overlay root.
+function applicationForElement(element, foundry, ui) {
+  return uniqueValues([
+    ...registryValues(foundry?.applications?.instances),
+    ...Object.values(ui?.windows ?? {}),
+    ui?.activeWindow
+  ]).find((app) => applicationElement(app) === element) ?? null;
+}
+
+/** Move ApplicationV2 through its public positioning API so physical touch
+ * never depends on synthetic pointer capture. */
+export function createApplicationWindowMover(application, root) {
+  if (typeof application?.setPosition !== "function") return null;
+  let origin = null;
+  return ({ phase, deltaX = 0, deltaY = 0 } = {}) => {
+    if (phase === "start" || !origin) {
+      const rect = root?.getBoundingClientRect?.() ?? {};
+      const position = application.position ?? {};
+      origin = Object.freeze({
+        left: finiteNumber(position.left, rect.left),
+        top: finiteNumber(position.top, rect.top),
+        width: position.width,
+        height: position.height
+      });
+    }
+    if (phase !== "end") {
+      const next = { left: origin.left + Number(deltaX || 0), top: origin.top + Number(deltaY || 0) };
+      if (origin.width !== undefined) next.width = origin.width;
+      if (origin.height !== undefined) next.height = origin.height;
+      application.setPosition(next);
+    }
+    if (phase === "end") origin = null;
+    return true;
+  };
+}
+
+/** Some persistent ApplicationV2-shaped overlays are intentionally omitted
+ * from Foundry's application registry. Move only roots that expose positioned
+ * geometry, and restore no global behavior outside the enabled overlay scope. */
+export function createPositionedElementMover(root) {
+  const style = root?.style;
+  if (!style?.setProperty || !root?.getBoundingClientRect) return null;
+  // Read the requested horizontal edge from the overlay configuration.
+  const readLeft = () => style.getPropertyValue?.("left") ?? style.left ?? "";
+  // Read the requested vertical edge from the overlay configuration.
+  const readTop = () => style.getPropertyValue?.("top") ?? style.top ?? "";
+  const inlineLeft = readLeft();
+  const inlineTop = readTop();
+  if (!String(inlineLeft).trim() && !String(inlineTop).trim()) return null;
+  let origin = null;
+  return ({ phase, deltaX = 0, deltaY = 0 } = {}) => {
+    if (phase === "start" || !origin) {
+      const rect = root.getBoundingClientRect() ?? {};
+      origin = Object.freeze({
+        left: finiteNumber(Number.parseFloat(readLeft()), rect.left),
+        top: finiteNumber(Number.parseFloat(readTop()), rect.top)
+      });
+    }
+    if (phase !== "end") {
+      style.setProperty("left", `${origin.left + Number(deltaX || 0)}px`);
+      style.setProperty("top", `${origin.top + Number(deltaY || 0)}px`);
+    }
+    if (phase === "end") origin = null;
+    return true;
+  };
+}
+
+// Convert finite numeric configuration values while rejecting invalid values.
+function finiteNumber(value, fallback = 0) {
+  // Convert a finite numeric input or use the specified fallback.
+  const number = Number(value);
+  if (Number.isFinite(number)) return number;
+  const alternative = Number(fallback);
+  return Number.isFinite(alternative) ? alternative : 0;
+}
+
+// Collect plausible module overlay roots from explicit adapters and known DOM candidates.
+function boundedCandidates(document, appOwnership) {
+  const result = [];
+  const seen = new Set();
+  const queue = [];
+  // Add one candidate only when its root and module identity are not already represented.
+  const push = (element) => {
+    if (!element || seen.has(element) || result.length >= MAX_SCAN_ELEMENTS) return false;
+    seen.add(element);
+    result.push(element);
+    return true;
+  };
+  for (const element of appOwnership.keys()) push(element);
+  for (const definitions of Object.values(MODULE_OVERLAY_ADAPTERS)) {
+    if (!definitions.length) continue;
+    for (const definition of definitions) push(document.getElementById?.(definition.rootId));
+  }
+  for (const element of document.body?.children ?? []) queue.push({ element, depth: 0 });
+  for (const id of SCAN_ROOT_IDS) {
+    const element = document.getElementById?.(id);
+    if (element) queue.push({ element, depth: 0 });
+  }
+  while (queue.length && result.length < MAX_SCAN_ELEMENTS) {
+    const { element, depth } = queue.shift();
+    push(element);
+    if (depth >= MAX_SCAN_DEPTH || shouldSkipDescendants(element)) continue;
+    for (const child of element?.children ?? []) queue.push({ element: child, depth: depth + 1 });
+  }
+  return result;
+}
+
+// Resolve an element’s likely owning module from its application, root, and registered module metadata.
+function identifyModuleOwnership(element, modules, rootId = stableRootId(element)) {
+  const explicit = [element?.dataset?.moduleId, element?.dataset?.module, element?.dataset?.packageId].filter(Boolean).map(String);
+  if (explicit.length) {
+    const matches = modules.filter((module) => explicit.includes(String(module.id)));
+    if (matches.length === 1) return owned(matches[0], "explicit module/package metadata", adapterFor(matches[0], rootId));
+    if (matches.length > 1) return ambiguous(matches, "conflicting explicit module/package metadata");
+    return rejected("explicit module/package metadata is not an active module");
+  }
+  const adapterMatches = modules.flatMap((module) => {
+    const adapter = adapterFor(module, rootId);
+    return adapter ? [{ module, adapter }] : [];
+  });
+  if (adapterMatches.length === 1) return owned(adapterMatches[0].module, `compatibility adapter: ${adapterMatches[0].adapter.evidence}`, adapterMatches[0].adapter);
+  if (adapterMatches.length > 1) return ambiguous(adapterMatches.map((entry) => entry.module), "multiple compatibility adapters claim this root");
+
+  const identities = [...ownershipIdentities(element), ...(element?.ownershipFragments ?? [])];
+  if (!identities.length) return rejected("no ownership namespace metadata");
+  const matches = modules.filter((module) => moduleAliases(module).some((alias) => alias.length >= 4 && identities.some((identity) => tokenContains(identity, alias))));
+  if (matches.length === 1) return owned(matches[0], "unambiguous active-module namespace", adapterFor(matches[0], rootId));
+  if (matches.length > 1) return ambiguous(matches, "namespace matches multiple active modules");
+  return rejected("no active-module ownership match");
+}
+
+// Classify the application’s role from its capabilities and semantic DOM structure.
+function overlayRole(element, application, adapter, document) {
+  if (adapter) return Object.freeze({ accepted: true, reason: adapter.evidence });
+  const identity = `${element?.id ?? ""} ${typeof element?.className === "string" ? element.className : ""}`;
+  const semantic = OVERLAY_WORDS.test(identity);
+  if (element?.matches?.("dialog, [role='dialog']")) return Object.freeze({ accepted: false, reason: localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.OrdinaryDialogApplication", "ordinary dialog application") });
+  if (application) {
+    const app = application.app;
+    const frameLess = app?.options?.window?.frame === false || app?.options?.window?.positioned === false || app?.options?.popOut === false;
+    const frameHidden = renderedApplicationFrameHidden(element, document);
+    const explicitOverlayClass = explicitOverlayStructure(element);
+    if (frameLess) return Object.freeze({ accepted: true, reason: "module-owned frameless application" });
+    if (frameHidden) return Object.freeze({ accepted: true, reason: "module-owned application with hidden rendered frame" });
+    if (semantic && (explicitOverlayClass || app?.nonDismissible === true)) return Object.freeze({ accepted: true, reason: "module-owned persistent overlay application" });
+    return Object.freeze({ accepted: false, reason: localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.OrdinaryModuleApplicationWindow", "ordinary module application window") });
+  }
+  const framedWindow = element?.classList?.contains?.("window-app") || element?.classList?.contains?.("application");
+  const explicitOverlayClass = explicitOverlayStructure(element);
+  if (framedWindow && !explicitOverlayClass) return Object.freeze({ accepted: false, reason: localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.OrdinaryModuleApplicationWindow", "ordinary module application window") });
+  if (!semantic) return Object.freeze({ accepted: false, reason: localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.RootDoesNotDescribePersistentSceneAdjacentUI", "root does not describe persistent Scene-adjacent UI") });
+  const interactive = Boolean(element?.matches?.("aside, nav, [role='toolbar'], [role='region']")
+    || element?.querySelector?.("button, a[href], input, select, textarea, [role='button'], canvas"));
+  return Object.freeze({ accepted: interactive, reason: interactive ? localizeFoundry("VEMOBILE.Interface.ModuleOverlayGateway.OwnedSemanticInteractiveOverlayRoot", "owned semantic interactive overlay root") : "non-interactive infrastructure root" });
+}
+
+// Recognize a supported explicit overlay marker in the candidate’s own structure.
+function explicitOverlayStructure(element) {
+  return Boolean(element?.matches?.(".overlay, .widget, .hud, [role='toolbar'], [role='region']")
+    || /(?:^|\s)[^\s]*docked(?:\s|$)/iu.test(String(element?.className ?? "")));
+}
+
+// Detect when Foundry has hidden an application frame, which makes it unsuitable for overlay admission.
+function renderedApplicationFrameHidden(element, document) {
+  const header = element?.querySelector?.(".window-header");
+  if (!header) return false;
+  const style = computedStyle(document, header);
+  const rootStyle = computedStyle(document, element);
+  return header.hidden === true
+    || header.getAttribute?.("aria-hidden") === "true"
+    || style?.display === "none"
+    || (style?.visibility === "hidden" && rootStyle?.visibility !== "hidden");
+}
+
+/** Select Foundry's drag event lifecycle from the rendered application structure. */
+export function classifyOverlayInteraction(root) {
+  const hasHeader = Boolean(root?.querySelector?.(".window-header"));
+  if (!hasHeader) return "mouse-target";
+  if (root?.matches?.(".app.window-app, .window-app:not(.application)")) return "pointer-window";
+  if (root?.matches?.(".application")) return "pointer-root";
+  return "pointer-window";
+}
+
+// Return the recognized module-ownership result for a candidate.
+function owned(module, reason, adapter = null) {
+  return Object.freeze({ status: "owned", module, reason, adapter });
+}
+
+// Return the reason a candidate failed module-overlay eligibility checks.
+function rejected(reason) {
+  return Object.freeze({ status: "rejected", reason });
+}
+
+// Mark a candidate whose module or semantic role cannot be established safely.
+function ambiguous(modules, reason) {
+  return Object.freeze({ status: "ambiguous", modules: Object.freeze(modules), reason });
+}
+
+// Find the registered module adapter for the identified module.
+function adapterFor(module, rootId) {
+  return MODULE_OVERLAY_ADAPTERS[module?.id]?.find((entry) => entry.rootId === rootId) ?? null;
+}
+
+function safeKnownRoot(root, module, document, entry) {
+  // Admission markers describe presentation, not the identity of a root that
+  // has already been discovered. They must not erase catalogue ownership.
+  if (excludedElement(root, { known: true }) || stableRootId(root) === "") return false;
+  if (!document?.body?.contains?.(root) && root !== document?.body) return false;
+  const exactCatalogIdentity = stableRootId(root) === entry?.rootId
+    && entry?.id === `${module.id}:${semanticSlug(entry.rootId)}`;
+  const ownership = identifyModuleOwnership(root, [module]);
+  return exactCatalogIdentity && (ownership.status === "owned" || Boolean(entry?.moduleId === module.id));
+}
+
+// Exclude Foundry infrastructure and elements that cannot act as overlay roots.
+function excludedElement(element, { known = false } = {}) {
+  return element?.id === "dice-box-canvas" || Boolean(element?.closest?.(known
+    ? ".ve-mobile-app, .ve-mobile-bootstrap, .ve-mobile-settings-app, #notifications, #tooltip, #context-menu"
+    : ".ve-mobile-app, .ve-mobile-bootstrap, .ve-mobile-dialog, .ve-mobile-settings-app, #notifications, #tooltip, #context-menu")
+    || element?.matches?.("script, style, link, template"));
+}
+
+// Stop scanning below an element whose subtree cannot contain an independent supported overlay.
+function shouldSkipDescendants(element) {
+  return Boolean(element?.matches?.("script, style, link, template, canvas")
+    || element?.closest?.(".ve-mobile-app, .ve-mobile-bootstrap, .ve-mobile-dialog, .ve-mobile-settings-app"));
+}
+
+// Collect the candidate element and supported descendants that can host persistent overlays.
+function overlayHosts(root, document) {
+  const result = [];
+  let current = root?.parentElement;
+  while (current && current !== document?.body) {
+    result.push(current);
+    current = current.parentElement;
+  }
+  return result;
+}
+
+/** Combine live root geometry and adapter state into the overlay safety snapshot. */
+export function inspectOverlayRuntime(entry, document, adapters = new Map(), viewport = null, capturedFor = "current") {
+  const root = document?.getElementById?.(entry.rootId) ?? null;
+  const style = computedStyle(document, root);
+  const rect = safeRect(root);
+  const hiddenAncestor = firstHiddenAncestor(root, document);
+  return Object.freeze({
+    id: entry.id,
+    moduleId: entry.moduleId,
+    rootId: entry.rootId,
+    capturedFor,
+    rootExpected: true,
+    present: Boolean(root),
+    connected: Boolean(root && root.isConnected !== false),
+    admitted: Boolean(root?.classList?.contains?.(VISIBLE_CLASS) && adapters.has(root)),
+    admissionClass: Boolean(root?.classList?.contains?.(VISIBLE_CLASS)),
+    hostClasses: Object.freeze(overlayHosts(root, document).map((host) => Boolean(host?.classList?.contains?.(HOST_CLASS)))),
+    display: style?.display ?? "unknown",
+    visibility: style?.visibility ?? "unknown",
+    opacity: style?.opacity ?? "unknown",
+    pointerEvents: style?.pointerEvents ?? "unknown",
+    position: style?.position ?? "unknown",
+    zIndex: style?.zIndex ?? "unknown",
+    scale: String(style?.scale ?? root?.style?.getPropertyValue?.("scale") ?? "unknown").slice(0, 80),
+    transform: String(style?.transform ?? root?.style?.getPropertyValue?.("translate") ?? "unknown").slice(0, 180),
+    rect,
+    sceneRect: viewport ? sceneRect(viewport) : null,
+    offscreen: Boolean(rect && viewport && (rect.left + rect.width <= viewport.left || rect.top + rect.height <= viewport.top || rect.left >= viewport.left + viewport.width || rect.top >= viewport.top + viewport.height)),
+    hiddenAncestor: hiddenAncestor ? String(hiddenAncestor.id || hiddenAncestor.className || hiddenAncestor.tagName || "ancestor").slice(0, 180) : "none"
+  });
+}
+
+// Read computed style defensively when a browser style surface is available.
+function computedStyle(document, element) {
+  try { return element ? document?.defaultView?.getComputedStyle?.(element) ?? globalThis.getComputedStyle?.(element) ?? null : null; } catch { return null; }
+}
+
+// Return finite element bounds or null for detached and invalid nodes.
+function safeRect(element) {
+  try {
+    const rect = element?.getBoundingClientRect?.();
+    return rect ? Object.freeze({ left: number(rect.left), top: number(rect.top), width: number(rect.width), height: number(rect.height) }) : null;
+  } catch { return null; }
+}
+
+// Find the nearest ancestor that hides the candidate from layout or interaction.
+function firstHiddenAncestor(root, document) {
+  let current = root;
+  while (current && current !== document?.body) {
+    const style = computedStyle(document, current);
+    if (style?.display === "none" || style?.visibility === "hidden" || style?.opacity === "0") return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+// Format touch/overlay observations into the bounded diagnostic representation.
+function formatTouchTrace(event) {
+  return `event=${event.event} phase=${event.phase} pointer=${event.pointerId}/${event.pointerType} buttons=${event.buttons} pressure=${event.pressure} captured=${event.captured} prevented=${event.defaultPrevented} touchAction=${event.touchAction}`;
+}
+
+// Convert a value to a finite number, preserving invalid measurements as null.
+function number(value) {
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
+}
+
+// Choose a readable overlay label from adapter and application metadata.
+function friendlyOverlayName(element, module, adapter = null) {
+  if (adapter?.overlayName) return adapter.overlayName;
+  const explicit = element?.dataset?.overlayName ?? element?.getAttribute?.("aria-label") ?? element?.getAttribute?.("title");
+  if (String(explicit ?? "").trim()) return String(explicit).trim().slice(0, 160);
+  let value = stableRootId(element);
+  for (const alias of moduleAliases(module)) value = value.replace(new RegExp(escapePattern(alias), "giu"), " ");
+  value = value.replace(/(?:overlay|widget|toolbar|panel|container|root)/giu, " ");
+  const words = value.split(/[-_\s]+/u).filter(Boolean).map((word) => word[0].toUpperCase() + word.slice(1));
+  return words.join(" ") || "Canvas Overlay";
+}
+
+// Build a stable identifier from the module and root metadata when no explicit ID exists.
+function stableRootId(element) {
+  const id = String(element?.id ?? "").trim();
+  if (!/^[A-Za-z][A-Za-z0-9:_-]{1,159}$/u.test(id) || /^app-?\d+$/iu.test(id)) return "";
+  return id;
+}
+
+const SCENE_TAB_IDENTITY = /(?:^|[-_\s])scene[-_\s](?:nav(?:igation)?|tabs?)(?:$|[-_\s])/iu;
+
+// Recognize Foundry’s Scene tab surface so it is not treated as a module-owned overlay.
+function isSceneTabSurface(element) {
+  if (element?.closest?.("#scene-navigation")) return true;
+  return SCENE_TAB_IDENTITY.test(`${element?.id ?? ""} ${typeof element?.className === "string" ? element.className : ""} ${element?.dataset?.moduleId ?? ""} ${element?.dataset?.module ?? ""}`);
+}
+
+// Recognize the supported Carolingian dock surface by its current DOM signature.
+function isCarolingianSurface(element) {
+  if ([element?.dataset?.moduleId, element?.dataset?.module, element?.dataset?.packageId].includes("crlngn-ui")) return true;
+  return /(?:^|[-_\s])crlngn[-_]/iu.test(`${element?.id ?? ""} ${typeof element?.className === "string" ? element.className : ""}`);
+}
+
+// Reject modules whose known surface must not be admitted as a persistent overlay.
+function isBlockedOverlayModule(module) {
+  return module?.id === "crlngn-ui" || SCENE_TAB_IDENTITY.test(`${module?.id ?? ""} ${module?.title ?? ""}`);
+}
+
+function forbiddenOverlayEntry(entry) {
+  // DSN's temporary roll renderer is governed by the dice presentation owner,
+  // not the optional persistent overlay catalogue (including old catalogues).
+  return entry.rootId === "dice-box-canvas" || isBlockedOverlayModule({ id: entry.moduleId, title: entry.moduleTitle })
+    || SCENE_TAB_IDENTITY.test(`${entry.rootId} ${entry.overlayName}`);
+}
+
+// Validate saved module overlay entries and clamp their persisted settings to supported bounds.
+function normalizeCatalog(value) {
+  const entries = Array.isArray(value) ? value : value?.entries;
+  return Object.freeze({
+    scanned: value?.scanned === true,
+    entries: Object.freeze((Array.isArray(entries) ? entries : []).slice(0, 128).map((entry) => Object.freeze({
+      id: String(entry?.id ?? ""),
+      moduleId: String(entry?.moduleId ?? ""),
+      moduleTitle: String(entry?.moduleTitle ?? entry?.moduleId ?? "Module"),
+      overlayName: String(entry?.overlayName ?? "Canvas Overlay"),
+      rootId: String(entry?.rootId ?? "")
+    })).filter((entry) => entry.id && entry.moduleId && entry.rootId && !forbiddenOverlayEntry(entry)))
+  });
+}
+
+// Normalize a visibility value to the gateway’s explicit visible/hidden states.
+function normalizeVisibility(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return Object.freeze({});
+  return Object.freeze(Object.fromEntries(Object.entries(value).filter(([key, enabled]) => key && enabled === true)));
+}
+
+/** Normalize one UI scale to five-point steps within the supported range. */
+export function normalizeOverlayScale(value) {
+  const scale = Math.round(Number(value) / 5) * 5;
+  return Number.isFinite(scale) ? Math.max(50, Math.min(100, scale)) : 100;
+}
+
+/** Keep only valid overlay IDs and non-default normalized scale values. */
+export function normalizeScaleRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return Object.freeze({});
+  return Object.freeze(Object.fromEntries(Object.entries(value)
+    .filter(([id]) => Boolean(String(id).trim()))
+    .map(([id, scale]) => [String(id), normalizeOverlayScale(scale)])
+    .filter(([, scale]) => scale !== 100)
+    .slice(0, 128)));
+}
+
+/** Deduplicate and bound persisted order IDs before they reach sorting logic. */
+export function normalizeOrder(value) {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze([...new Set(value.map((entry) => String(entry ?? "").trim()).filter(Boolean))].slice(0, 128));
+}
+
+/** Preserve user order and append newly discovered overlays deterministically. */
+export function orderOverlayEntries(entries, storedOrder = []) {
+  const source = [...(entries ?? [])];
+  const byId = new Map(source.map((entry) => [entry.id, entry]));
+  const ordered = normalizeOrder(storedOrder).flatMap((id) => byId.has(id) ? [byId.get(id)] : []);
+  const used = new Set(ordered.map((entry) => entry.id));
+  ordered.push(...source.filter((entry) => !used.has(entry.id)).sort((a, b) => String(a.moduleTitle).localeCompare(String(b.moduleTitle)) || String(a.overlayName).localeCompare(String(b.overlayName))));
+  return Object.freeze(ordered);
+}
+
+// Read a Foundry setting with a safe fallback when the module namespace or key is unavailable.
+function readSetting(game, key) {
+  try { return game?.settings?.get?.(MODULE_ID, key); } catch { return undefined; }
+}
+
+// Resolve an application’s current root element across supported Foundry application shapes.
+function applicationElement(app) {
+  const element = app?.element;
+  if (element?.nodeType === 1) return element;
+  if (element?.[0]?.nodeType === 1) return element[0];
+  return null;
+}
+
+// Observe root detachment and release or reconcile overlay ownership when the DOM node is removed.
+function watchRootRemoval(root, scope, onRemoved) {
+  const parent = root?.parentNode;
+  const Observer = root?.ownerDocument?.defaultView?.MutationObserver ?? globalThis.MutationObserver;
+  if (!parent || typeof Observer !== "function") return;
+  const observer = new Observer(() => {
+    if (root.isConnected !== false) return;
+    observer.disconnect();
+    scope.dispose();
+    onRemoved?.();
+  });
+  observer.observe(parent, { childList: true });
+  scope.own(() => observer.disconnect());
+}
+
+/** Clip painting and hit-testing to the authoritative Scene rectangle. */
+export function createSceneBoundPresentation(root, adapter, scope, application = null) {
+  const style = root?.style;
+  if (!style?.setProperty || !root?.getBoundingClientRect) return Object.freeze({ update() {} });
+  const applicationScale = createApplicationScaleController(application);
+  const original = Object.freeze({
+    clipPath: style.getPropertyValue("clip-path"),
+    clipPriority: style.getPropertyPriority("clip-path"),
+    translate: style.getPropertyValue("translate"),
+    translatePriority: style.getPropertyPriority("translate"),
+    order: style.getPropertyValue("--ve-mobile-overlay-order"),
+    orderPriority: style.getPropertyPriority("--ve-mobile-overlay-order"),
+    scale: style.getPropertyValue("scale"),
+    scalePriority: style.getPropertyPriority("scale"),
+    transformOrigin: style.getPropertyValue("transform-origin"),
+    transformOriginPriority: style.getPropertyPriority("transform-origin")
+  });
+  // Restore the presentation-owned styles and properties captured for this root.
+  const restore = () => {
+    applicationScale?.restore();
+    restoreProperty(style, "clip-path", original.clipPath, original.clipPriority);
+    restoreProperty(style, "translate", original.translate, original.translatePriority);
+    restoreProperty(style, "--ve-mobile-overlay-order", original.order, original.orderPriority);
+    restoreProperty(style, "scale", original.scale, original.scalePriority);
+    restoreProperty(style, "transform-origin", original.transformOrigin, original.transformOriginPriority);
+    root?.classList?.remove?.("ve-mobile-overlay-pass-through-root");
+  };
+  scope?.own?.(restore);
+  return Object.freeze({
+    // Apply viewport, stack order, and scale while retaining the root's original inline styles.
+    update(viewport, order = 0, requestedScale = 100) {
+      restoreProperty(style, "translate", original.translate, original.translatePriority);
+      restoreProperty(style, "clip-path", original.clipPath, original.clipPriority);
+      restoreProperty(style, "scale", original.scale, original.scalePriority);
+      restoreProperty(style, "transform-origin", original.transformOrigin, original.transformOriginPriority);
+      const scale = normalizeOverlayScale(requestedScale);
+      const scaledByApplication = applicationScale?.update(scale) === true;
+      if (!scaledByApplication && scale !== 100) {
+        style.setProperty("scale", String(scale / 100), "important");
+        style.setProperty("transform-origin", "top left", "important");
+      }
+      const scene = sceneRect(viewport);
+      if (!scene) return;
+      style.setProperty("--ve-mobile-overlay-order", String(Math.max(0, Math.min(127, Number(order) || 0))));
+      let rect = root.getBoundingClientRect();
+      if (!rect || !(rect.width > 0) || !(rect.height > 0)) return;
+      let dx = 0;
+      let dy = 0;
+      const edge = adapter?.sceneEdge ?? explicitHorizontalEdge(root);
+      const inset = 12;
+      if (rect.width <= scene.width - inset * 2 && edge === "right") dx = scene.right - inset - rect.right;
+      else if (rect.width <= scene.width - inset * 2 && edge === "left") dx = scene.left + inset - rect.left;
+      else if (rect.width <= scene.width) dx = clampDelta(rect.left, rect.right, scene.left, scene.right);
+      else dx = scene.left - rect.left;
+      if (rect.height <= scene.height) dy = clampDelta(rect.top, rect.bottom, scene.top, scene.bottom);
+      else dy = scene.top - rect.top;
+      if (dx || dy) {
+        style.setProperty("translate", `${dx}px ${dy}px`, "important");
+        rect = { ...rect, left: rect.left + dx, right: rect.right + dx, top: rect.top + dy, bottom: rect.bottom + dy };
+      }
+      const top = Math.max(0, scene.top - rect.top);
+      const right = Math.max(0, rect.right - scene.right);
+      const bottom = Math.max(0, rect.bottom - scene.bottom);
+      const left = Math.max(0, scene.left - rect.left);
+      style.setProperty("clip-path", `inset(${top}px ${right}px ${bottom}px ${left}px)`, "important");
+      root?.classList?.toggle?.("ve-mobile-overlay-pass-through-root", transparentHitAreaRoot(root, rect, scene));
+    }
+  });
+}
+
+// Resolve a user-selected horizontal dock edge from the saved edge or viewport geometry.
+function explicitHorizontalEdge(root) {
+  const style = computedStyle(root?.ownerDocument, root);
+  if (!style || !["absolute", "fixed"].includes(style.position)) return null;
+  // An arbitrary absolute left coordinate is also used by draggable floating
+  // windows. Only a small declared inset is evidence of an edge anchor.
+  const inset = value => /^\d+(?:\.\d+)?px$/u.test(String(value ?? "")) && Number.parseFloat(value) <= 80;
+  const left = inset(style.left);
+  const right = inset(style.right);
+  if (right && !left) return "right";
+  if (left && !right) return "left";
+  return null;
+}
+
+/** Keep ApplicationV2's authoritative geometry and its painted scale in sync.
+ * AppV1 and generic DOM overlays deliberately fall back to presentation-only CSS. */
+function createApplicationScaleController(application) {
+  if (typeof application?.setPosition !== "function") return null;
+  const initialScale = Number(application.position?.scale);
+  if (!Number.isFinite(initialScale) || !(initialScale > 0)) return null;
+  let changed = false;
+  return Object.freeze({
+    // Apply the requested scale while preserving the overlay's original style for later restoration.
+    update(requestedScale) {
+      const desired = initialScale * normalizeOverlayScale(requestedScale) / 100;
+      const current = Number(application.position?.scale);
+      if (Number.isFinite(current) && Math.abs(current - desired) < 0.0001) return true;
+      try {
+        application.setPosition({ scale: desired });
+        changed = true;
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // Restore the exact inline style values captured when this overlay adapter was created.
+    restore() {
+      if (!changed) return;
+      try {
+        const current = Number(application.position?.scale);
+        if (!Number.isFinite(current) || Math.abs(current - initialScale) >= 0.0001) {
+          application.setPosition({ scale: initialScale });
+        }
+      } catch {}
+      changed = false;
+    }
+  });
+}
+
+/** Full-scene transparent containers must not steal hits outside their visible controls. */
+export function transparentHitAreaRoot(root, rect = safeRect(root), scene = null) {
+  if (!rect || !scene || rect.width < scene.width * 0.8 || rect.height < scene.height * 0.8) return false;
+  const style = computedStyle(root?.ownerDocument, root);
+  const transparent = !style || style.backgroundColor === "transparent" || style.backgroundColor === "rgba(0, 0, 0, 0)" || Number(style.opacity ?? 1) === 0;
+  return transparent && Boolean(root?.querySelector?.("button, a[href], input, select, textarea, [role='button'], [role='toolbar']"));
+}
+
+// Read the current Scene canvas bounds used to constrain overlay positioning.
+function sceneRect(viewport) {
+  const left = Number(viewport?.left);
+  const top = Number(viewport?.top);
+  const width = Number(viewport?.width);
+  const height = Number(viewport?.height);
+  if (![left, top, width, height].every(Number.isFinite) || !(width > 0) || !(height > 0)) return null;
+  return { left, top, width, height, right: left + width, bottom: top + height };
+}
+
+// Limit a drag offset so the overlay remains within the available viewport.
+function clampDelta(start, end, minimum, maximum) {
+  if (start < minimum) return minimum - start;
+  if (end > maximum) return maximum - end;
+  return 0;
+}
+
+// Restore one captured inline property only if the gateway still owns the value.
+function restoreProperty(style, property, value, priority) {
+  if (value) style.setProperty(property, value, priority);
+  else style.removeProperty(property);
+}
+
+// Summarize overlay discovery outcomes without serializing live DOM or application objects.
+function formatScanDiagnostic(candidate) {
+  const result = String(candidate?.outcome ?? "rejected").toUpperCase();
+  return [
+    "Module Overlay Scan",
+    `candidate=#${candidate?.rootId ?? "unknown"}`,
+    `owner=${candidate?.owner ?? candidate?.moduleId ?? "unresolved"}`,
+    `source=${candidate?.source ?? "dom"}`,
+    `connected=${candidate?.connected ?? "unknown"}`,
+    `classification=${candidate?.classification ?? "unclassified"}`,
+    `result=${result}`,
+    `reason=${candidate?.reason ?? "none"}`
+  ].join(" | ");
+}
+
+// Read values from the supported Foundry application registry shape.
+function registryValues(registry) {
+  try { return typeof registry?.values === "function" ? [...registry.values()] : []; } catch { return []; }
+}
+
+// Return the first occurrence of each value while retaining discovery order.
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+// Collect normalized module IDs and names that can identify an owning application.
+function moduleAliases(module) {
+  const id = semanticSlug(module?.id);
+  const title = semanticSlug(module?.title);
+  const aliases = new Set([id, title]);
+  for (const prefix of ["foundryvtt-", "fvtt-"]) if (id.startsWith(prefix)) aliases.add(id.slice(prefix.length));
+  for (const suffix of ["-foundryvtt", "-fvtt"]) if (id.endsWith(suffix)) aliases.add(id.slice(0, -suffix.length));
+  return [...aliases].filter(Boolean);
+}
+
+/** Attribute a stable overlay shell from a bounded sample of the module-owned
+ * namespace metadata it contains. This admits dock shells without turning a
+ * document-wide descendant scan into module discovery. */
+function ownershipIdentities(element) {
+  const fragments = [
+    element?.id,
+    typeof element?.className === "string" ? element.className : "",
+    ...Object.values(element?.dataset ?? {})
+  ];
+  const descendants = [];
+  const queue = [...(element?.children ?? [])];
+  while (queue.length && descendants.length < MAX_OWNERSHIP_DESCENDANTS) {
+    const descendant = queue.shift();
+    if (!descendant) continue;
+    descendants.push(descendant);
+    for (const child of descendant.children ?? []) {
+      if (descendants.length + queue.length >= MAX_OWNERSHIP_DESCENDANTS) break;
+      queue.push(child);
+    }
+  }
+  for (const descendant of descendants) {
+    fragments.push(
+      descendant?.id,
+      typeof descendant?.className === "string" ? descendant.className : "",
+      ...Object.values(descendant?.dataset ?? {})
+    );
+  }
+  return [...new Set(fragments.map(semanticSlug).filter(Boolean))];
+}
+
+// Check whether a normalized text token contains the requested identifier.
+function tokenContains(identity, alias) {
+  return identity === alias || identity.startsWith(`${alias}-`) || identity.endsWith(`-${alias}`) || identity.includes(`-${alias}-`);
+}
+
+// Normalize human labels into comparable lowercase semantic keys.
+function semanticSlug(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 160);
+}
+
+// Escape special characters before using module text in a regular expression.
+function escapePattern(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+export { HOST_CLASS, VISIBLE_CLASS, MAX_SCAN_DEPTH, MAX_SCAN_ELEMENTS, MODULE_OVERLAY_ADAPTERS };

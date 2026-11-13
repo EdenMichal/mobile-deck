@@ -1,0 +1,891 @@
+/* Character Builder (fork addition). Uses Mobile Deck's theme tokens so it follows the player's theme. */
+
+/* Level up: a square icon button just left of the character chooser (.ve-character-select-trigger in
+   ve-mobile.css), with the chooser's measures: a 44px tap box drawing a 28px bordered square toward its
+   top-right corner. "Ready" (XP reached the next level) fills the square and adds a dot. */
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up {
+  position: absolute;
+  top: var(--ve-header-control-top, -1px); /* shared with the chooser (ve-mobile.css) */
+  right: calc(var(--ve-header-control-right, -5px) + 36px); /* the chooser's 28px square plus an 8px gap; the boxes overlap only in that gap */
+  z-index: 3;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: var(--ve-character-accent);
+  background: transparent;
+  box-shadow: none;
+  font-size: 10px;
+  touch-action: manipulation;
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up::before {
+  content: "";
+  position: absolute;
+  inset: 5px 5px 11px 11px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 30%, var(--ve-border));
+  background: color-mix(in srgb, var(--ve-surface) 70%, transparent);
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up > i {
+  position: relative;
+  translate: 3px -3px;
+  font-size: 16px;
+  color: var(--ve-character-accent);
+  opacity: 0.85;
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up:active::before {
+  background: color-mix(in srgb, var(--ve-character-accent) 16%, var(--ve-surface));
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up.is-ready::before {
+  border-color: var(--ve-gold);
+  background: var(--ve-red);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--ve-red-bright) 35%, transparent);
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up.is-ready:active::before {
+  background: color-mix(in srgb, var(--ve-red) 80%, #000);
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up.is-ready > i {
+  color: #fff;
+  opacity: 1;
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header .ve-character-level-up.is-ready::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ve-gold);
+  box-shadow: 0 0 0 2px var(--ve-surface);
+}
+/* The name's first line runs under the controls column up to the chooser; stop it before the level-up square. */
+.ve-mobile-app[data-form-factor] .ve-compact-header:has(.ve-character-level-up) .ve-sheet-identity-copy h2 {
+  width: calc(100% + clamp(70px, 18cqw, 100px) + 4px - 44px);
+}
+.ve-mobile-app[data-form-factor] .ve-compact-header:has(.ve-character-level-up) .ve-sheet-identity-copy h2 > .ve-character-name-second {
+  width: calc(100% - clamp(70px, 18cqw, 100px) - 4px + 44px);
+}
+/* Scroll-collapsed header: the icon follows the chooser and fades out with the XP bar (the scroll
+   controller also makes it inert), giving the name its width back. */
+.ve-mobile-app[data-form-factor] .ve-character-heading[data-collapse] .ve-compact-header .ve-character-level-up {
+  top: calc(var(--ve-header-control-top, -1px) * (1 - var(--ve-header-inset-progress)));
+  right: calc(var(--ve-header-control-right, -5px) * (1 - var(--ve-header-inset-progress)) + 36px);
+  opacity: max(0, calc(1 - var(--ve-header-progress) * 2));
+}
+.ve-mobile-app[data-form-factor] .ve-character-heading[data-collapse] .ve-compact-header:has(.ve-character-level-up) .ve-sheet-identity-copy h2 {
+  width: calc(100% + (clamp(70px, 18cqw, 100px) + 4px - 44px) * (1 - var(--ve-header-progress)));
+}
+
+/* ==== Builder layer ====================================================================
+   The layer carries VE's own scope, .ve-character-screen (+ data-character-theme), so VE's
+   typography (Roboto Condensed, VE Work Sans headings) and class accents apply as on the sheet.
+   It reuses VE's components: .ve-sheet-card / -heading / -action, .ve-sheet-item-row / -art / -copy,
+   .ve-sheet-collection-section, .ve-hp-editor-heading-icon / -close and .ve-section-intro.
+   The rules below place them in a full-screen page and give the builder's own controls
+   (tabs, chips, segments, steppers, buttons) the same measures as VE's.
+   Rules are scoped to the builder's own page (.ve-builder), not to VE windows shown above it.
+   Selectors start with ".ve-mobile-app .ve-builder … button" where VE's generic button reset
+   (.ve-mobile-app button:not(.ve-native-chat *), specificity 0-2-1) would otherwise win. */
+
+.ve-mobile-app .ve-builder-layer,
+.ve-builder-layer {
+  position: fixed;
+  z-index: calc(var(--ve-layer-modal, 100) + 5);
+  inset: 0;
+  display: grid;
+  /* The one row and column stop at the screen size, or long screens grow past it and never scroll. */
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  background: rgb(8 7 7 / 0.72);
+  backdrop-filter: blur(7px);
+  color: var(--ve-text);
+  font: 400 16px/1.4 "Roboto Condensed", Arial, sans-serif;
+}
+.ve-builder-layer [hidden] { display: none !important; }
+.ve-builder button { cursor: pointer; }
+.ve-builder button:disabled { cursor: not-allowed; }
+/* Foundry's core CSS gives buttons a fixed height, nowrap and hover chrome; VE's own buttons undo the same. */
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder button {
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  line-height: 1.2;
+  white-space: normal;
+  text-align: left;
+  text-shadow: none;
+  box-shadow: none;
+}
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder button:hover { box-shadow: none; text-shadow: none; }
+
+.ve-builder {
+  /* Flex column, not grid rows: the hidden error banner would shift fixed grid rows. */
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 640px);
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  /* VE's full-screen item window background. */
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--ve-character-accent) 16%, transparent), transparent 38%),
+    var(--ve-bg);
+  box-shadow: 0 0 40px rgb(0 0 0 / 0.5);
+}
+
+/* Header: VE's dialog header (Hit Dice & Rest): icon tile, accent kicker, title, square close. */
+.ve-mobile-app .ve-builder .ve-builder-header {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  min-height: 66px;
+  padding: max(10px, var(--ve-safe-top, 0px)) 12px 10px 14px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--ve-border);
+  background: color-mix(in srgb, var(--ve-surface-up) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+.ve-builder-heading { min-width: 0; }
+.ve-mobile-app .ve-builder .ve-builder-header small {
+  display: block;
+  overflow: hidden;
+  color: var(--ve-character-accent);
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ve-mobile-app .ve-builder .ve-builder-header h2 {
+  display: -webkit-box;
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: var(--ve-text);
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ve-builder-header-icon .ve-sheet-tab-icon { width: 22px; height: 22px; }
+/* VE's square close (.ve-hp-editor-close), restated after the builder's button reset. */
+.ve-mobile-app .ve-builder button.ve-builder-close {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ve-border);
+  border-radius: 12px;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+  font-size: 1rem;
+}
+
+.ve-builder-progress { flex: none; height: 3px; background: color-mix(in srgb, var(--ve-border) 80%, transparent); overflow: hidden; }
+.ve-builder-progress > i { display: block; height: 100%; background: var(--ve-character-accent); transition: width 200ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .ve-builder-progress > i { transition: none; } }
+
+.ve-builder-error { flex: none; margin: 10px 12px 0; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--ve-red-bright) 60%, var(--ve-border)); border-radius: 12px 5px 12px 5px;
+  color: var(--ve-text); background: color-mix(in srgb, var(--ve-red-bright) 18%, var(--ve-surface)); font-size: 0.78rem; }
+
+.ve-mobile-app .ve-builder .ve-builder-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 12px 24px;
+  display: grid;
+  /* max-content rows: VE's cards clip (overflow: hidden), and an auto row would let them shrink. */
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 12px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.ve-builder-layer[aria-busy="true"] .ve-builder-body { opacity: 0.55; pointer-events: none; transition: opacity 120ms 150ms; }
+.ve-builder-stack { display: grid; grid-auto-rows: max-content; align-content: start; gap: 12px; min-width: 0; }
+
+/* Footer: VE's rest-dialog buttons. Primary is accent-filled, secondary outlined. */
+.ve-mobile-app .ve-builder .ve-builder-footer {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px max(12px, var(--ve-safe-bottom, 0px));
+  border-top: 1px solid var(--ve-border);
+  background: color-mix(in srgb, var(--ve-surface-up) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+/* No buttons (the level-up and creation start screens): no empty bar. */
+.ve-mobile-app .ve-builder .ve-builder-footer:not(:has(> :not([hidden]))) { display: none; }
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder button:is(.ve-builder-primary, .ve-builder-secondary),
+.ve-mobile-app .ve-builder-spell-pick-bar button.ve-builder-primary {
+  min-height: 52px;
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 13px 5px 13px 5px;
+  font-size: 1rem;
+  font-weight: 850;
+  text-align: center;
+}
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder button.ve-builder-primary,
+.ve-mobile-app .ve-builder-spell-pick-bar button.ve-builder-primary {
+  flex: 1;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 58%, var(--ve-border));
+  color: #fff;
+  background: color-mix(in srgb, var(--ve-character-accent) 72%, #351019);
+}
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder button.ve-builder-secondary {
+  border: 1px solid var(--ve-border);
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+}
+.ve-mobile-app .ve-builder .ve-builder-footer button.ve-builder-secondary { min-width: 104px; }
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder button.ve-builder-wide { width: 100%; }
+.ve-builder-card-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; padding: 0 12px 12px; }
+.ve-builder-inline-action { display: flex; justify-content: flex-end; margin-top: -6px; }
+
+/* Text: VE's sizes (.ve-section-intro 0.78rem, notes 0.7rem). */
+.ve-builder-lead { margin: 0; color: var(--ve-text); font-size: 0.86rem; line-height: 1.35; }
+.ve-builder-hint { margin: 0; color: var(--ve-subtle); font-size: 0.74rem; line-height: 1.35; }
+.ve-builder-empty { margin: 0; color: var(--ve-subtle); }
+.ve-builder .ve-builder-warning { color: color-mix(in srgb, var(--ve-red-bright) 70%, #ffb4b4) !important; }
+.ve-builder-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ve-builder-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ve-mobile-app .ve-builder .ve-section-intro { line-height: 1.35; }
+
+/* ---- Cards: VE's .ve-sheet-card and heading ---- */
+.ve-builder-sheet-card { min-width: 0; }
+.ve-builder .ve-sheet-card-heading { flex-wrap: nowrap; }
+.ve-builder .ve-sheet-card-heading h3 { flex: 1 1 auto; line-height: 1.2; }
+.ve-builder .ve-sheet-card-heading > :first-child { flex: none; }
+.ve-builder .ve-sheet-card-heading .ve-character-class-symbol { width: 1.15rem; height: 1.15rem; flex-basis: 1.15rem; color: var(--ve-character-accent); }
+.ve-builder .ve-sheet-card-heading .ve-sheet-tab-icon { width: 1.25rem; height: 1.25rem; }
+.ve-builder-heading-art { width: 26px; height: 26px; border: 1px solid color-mix(in srgb, var(--ve-character-accent) 60%, var(--ve-border)); border-radius: 7px; object-fit: cover; }
+.ve-builder-draft { border-color: color-mix(in srgb, var(--ve-character-accent) 66%, var(--ve-border)); }
+.ve-builder-draft-text { margin: 0; padding: 12px 14px 10px; color: var(--ve-text); font-size: 0.86rem; }
+
+/* ---- Rows: VE's .ve-sheet-item-row inside a card ---- */
+.ve-builder-list { display: grid; min-width: 0; }
+/* Row separators (VE's row border-top). Button rows lose borders to VE's button reset, so this outranks it. */
+.ve-mobile-app .ve-builder .ve-builder-list > :is(button, div, label) + :is(button, div, label),
+.ve-builder-list > .ve-builder-card-wrap:not([hidden]) ~ .ve-builder-card-wrap { border-top: 1px solid color-mix(in srgb, var(--ve-border) 76%, transparent); }
+.ve-builder-card-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: stretch; min-width: 0; background: var(--ve-surface); }
+.ve-builder-card-wrap.is-plain { grid-template-columns: minmax(0, 1fr); }
+.ve-mobile-app .ve-builder :is(button, div, label).ve-sheet-item-row {
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 10px;
+  grid-template-columns: 36px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  border-width: 0;
+  border-radius: 0;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+  text-align: left;
+}
+.ve-builder .ve-sheet-item-row > .fa-chevron-right,
+.ve-builder .ve-builder-card-check { justify-self: center; color: var(--ve-subtle); font-size: 0.72rem; }
+.ve-builder .ve-builder-card-check { font-size: 1rem; }
+.ve-builder .ve-sheet-item-copy { min-width: 0; display: grid; gap: 2px; }
+/* VE truncates names and subtitles to one line; the builder's carry choices (packages, prerequisites), so they wrap. */
+.ve-builder .ve-sheet-item-copy :is(strong, small) { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.ve-builder .ve-sheet-item-copy strong { font-size: 0.81rem; font-weight: 700; line-height: 1.3; }
+.ve-builder .ve-sheet-item-copy small { font-size: 0.65rem; line-height: 1.35; letter-spacing: 0.05em; }
+.ve-builder .ve-sheet-item-art { width: 36px; height: 36px; font-size: 0.95rem; }
+.ve-builder .ve-sheet-item-art .ve-character-class-symbol { width: 20px; height: 20px; flex-basis: 20px; color: var(--ve-character-accent); }
+.ve-builder .ve-sheet-item-art .ve-sheet-tab-icon { width: 22px; height: 22px; color: var(--ve-character-accent); }
+.ve-builder-option-letter { color: var(--ve-character-accent); font-family: "VE Work Sans", Arial, sans-serif; font-size: 0.95rem; font-weight: 800; }
+/* Selected: VE's active character-menu row (accent name, tinted row, accent check). */
+.ve-mobile-app .ve-builder .ve-sheet-item-row.is-selected { background: color-mix(in srgb, var(--ve-character-accent) 12%, var(--ve-surface)); }
+.ve-builder .ve-sheet-item-row.is-selected .ve-sheet-item-copy strong,
+.ve-builder .ve-sheet-item-row.is-selected .ve-builder-card-check { color: var(--ve-character-accent); }
+.ve-builder .ve-sheet-item-row.is-selected .ve-sheet-item-art { border-color: var(--ve-character-accent); }
+.ve-builder-card-wrap:has(.is-selected) { background: color-mix(in srgb, var(--ve-character-accent) 12%, var(--ve-surface)); }
+.ve-builder .ve-sheet-item-row:disabled { opacity: 0.46; }
+.ve-builder-card.is-static { cursor: default; }
+/* The details chevron: VE's row chevron, turned down while open. */
+.ve-mobile-app .ve-builder button.ve-builder-more {
+  width: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--ve-border) 60%, transparent);
+  border-radius: 0;
+  color: var(--ve-subtle);
+  background: transparent;
+  font-size: 0.78rem;
+}
+.ve-builder-more i { transition: transform 150ms ease; }
+.ve-mobile-app .ve-builder button.ve-builder-more[aria-expanded="true"] { color: var(--ve-character-accent); }
+.ve-builder-more[aria-expanded="true"] i { transform: rotate(90deg); }
+/* Details: VE's open item summary (tinted, indented under the art). */
+.ve-builder-card-details {
+  grid-column: 1 / -1;
+  padding: 12px 13px 13px;
+  border-top: 1px solid color-mix(in srgb, var(--ve-character-accent) 18%, var(--ve-border));
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-character-accent) 5%, var(--ve-surface-up));
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+/* Description tables (class traits): VE's item-window facts, label column then value. */
+.ve-builder-card-details table { width: 100%; margin: 8px 0; border: 0; border-collapse: collapse; background: none; font-size: 0.74rem; }
+.ve-builder-card-details :is(th, td) { padding: 6px 6px; border: 0; border-top: 1px solid var(--ve-border); background: none; text-align: left; vertical-align: top; }
+.ve-builder-card-details tr:first-child > * { border-top: 0; }
+.ve-builder-card-details th, .ve-builder-card-details tbody td:first-child:has(+ td) strong { color: var(--ve-subtle); font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.66rem; }
+.ve-builder-card-details :is(th, td):first-child { width: 36%; }
+.ve-builder-card-details > :first-child { margin-top: 0; }
+.ve-builder-card-details > :last-child { margin-bottom: 0; }
+.ve-builder-card-details :is(h1, h2, h3, h4) { color: var(--ve-character-accent); font-size: 0.86rem; }
+.ve-builder-card-details img { max-width: 100%; height: auto; }
+
+/* Search: VE's rest-dialog select field. */
+.ve-builder-search-row {
+  position: relative;
+  display: block;
+  margin: 10px 12px;
+}
+.ve-builder-search-row > i { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: var(--ve-subtle); font-size: 0.8rem; pointer-events: none; }
+.ve-mobile-app .ve-builder input.ve-builder-search {
+  width: 100%;
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 11px 6px 34px;
+  border: 1px solid color-mix(in srgb, var(--ve-border) 72%, transparent);
+  border-radius: 11px 5px 11px 5px;
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-surface-up) 70%, var(--ve-bg));
+  font-size: 16px;
+  box-shadow: none;
+}
+.ve-builder-search-row + .ve-builder-list,
+.ve-builder-search-row + .ve-builder-chips { border-top: 1px solid var(--ve-border); }
+
+/* ---- Field labels and fields: VE's small uppercase dialog labels ---- */
+.ve-builder-fields { display: grid; gap: 8px; padding: 12px 13px 13px; }
+.ve-builder-field { display: grid; gap: 6px; }
+.ve-builder .ve-builder-field-label {
+  display: block;
+  color: var(--ve-subtle);
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ve-builder-fields > .ve-builder-field-label:not(:first-child) { margin-top: 4px; }
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder :is(.ve-builder-details input, .ve-builder-enter input, .ve-builder-textarea) {
+  width: 100%;
+  height: auto;
+  min-height: 46px;
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--ve-border) 72%, transparent);
+  border-radius: 11px 5px 11px 5px;
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-surface-up) 70%, var(--ve-bg));
+  font-size: 16px;
+  box-shadow: none;
+}
+:is(.ve-mobile-app, .ve-builder-approval-window) .ve-builder .ve-builder-textarea { display: block; min-height: 120px; resize: vertical; line-height: 1.4; }
+.ve-builder :is(input, textarea)::placeholder { color: color-mix(in srgb, var(--ve-subtle) 70%, transparent); }
+.ve-builder :is(input, textarea):focus-visible { outline: 2px solid var(--ve-character-accent); outline-offset: -1px; }
+
+/* ---- Chips: VE's header control buttons (34px, 9px radius); selected = active-tab accent ---- */
+.ve-builder-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ve-builder-trait-slot > .ve-builder-chips,
+.ve-builder-owners,
+.ve-builder-spell-filters { padding: 12px 13px 13px; }
+.ve-mobile-app .ve-builder button.ve-builder-chip {
+  min-height: 38px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--ve-border);
+  border-radius: 9px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+}
+.ve-mobile-app .ve-builder button.ve-builder-chip.is-selected {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 60%, var(--ve-border));
+  color: var(--ve-character-accent);
+  background: linear-gradient(color-mix(in srgb, var(--ve-character-accent) 14%, var(--ve-surface-up)), color-mix(in srgb, var(--ve-character-accent) 6%, var(--ve-surface)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ve-character-accent) 16%, transparent);
+}
+.ve-mobile-app .ve-builder button.ve-builder-chip:disabled { opacity: 0.46; }
+
+/* ---- Segments: VE's sheet tab bar (bordered strip, accent-tinted active tile) ---- */
+.ve-builder-segments {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--ve-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ve-surface) 96%, transparent);
+}
+.ve-builder-fields .ve-builder-segments { background: var(--ve-surface-up); }
+.ve-mobile-app .ve-builder button.ve-builder-segment {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--ve-subtle);
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+}
+.ve-mobile-app .ve-builder button.ve-builder-segment.is-selected {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 60%, var(--ve-border));
+  color: var(--ve-character-accent);
+  background: linear-gradient(color-mix(in srgb, var(--ve-character-accent) 13%, var(--ve-surface-up)), var(--ve-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ve-character-accent) 16%, transparent), 0 0 12px color-mix(in srgb, var(--ve-character-accent) 19%, transparent);
+}
+
+/* ---- Creation tabs: VE's sheet tab bar (icon over a small label); done / attention marks ---- */
+.ve-mobile-app .ve-builder .ve-builder-tabs {
+  flex: none; /* or a long body (Review) shrinks the strip */
+  margin: 10px 12px 0;
+  padding: 4px;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  border: 1px solid var(--ve-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ve-surface) 96%, transparent);
+  scrollbar-width: none;
+}
+.ve-builder-tabs::-webkit-scrollbar { display: none; }
+.ve-mobile-app .ve-builder button.ve-builder-tab {
+  position: relative;
+  flex: 1 0 auto;
+  min-width: 42px;
+  min-height: 52px;
+  padding: 6px 3px 5px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--ve-subtle);
+  background: transparent;
+  text-align: center;
+}
+.ve-builder-tab-icon { width: 22px; height: 22px; display: grid; place-items: center; font-size: 1.05rem; }
+.ve-builder-tab-icon .ve-sheet-tab-icon { width: 22px; height: 22px; }
+.ve-builder-tab-icon .ve-character-class-symbol { width: 21px; height: 21px; flex-basis: 21px; }
+.ve-mobile-app .ve-builder .ve-builder-tab-label { font-size: 0.56rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; white-space: nowrap; }
+.ve-mobile-app .ve-builder button.ve-builder-tab:is(.is-done, .is-attention) { color: color-mix(in srgb, var(--ve-text) 82%, var(--ve-subtle)); }
+.ve-mobile-app .ve-builder button.ve-builder-tab.is-active {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 60%, var(--ve-border));
+  color: var(--ve-character-accent);
+  background: linear-gradient(color-mix(in srgb, var(--ve-character-accent) 13%, var(--ve-surface-up)), var(--ve-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ve-character-accent) 16%, transparent), 0 0 12px color-mix(in srgb, var(--ve-character-accent) 19%, transparent);
+}
+.ve-builder-tab > .fa-check { position: absolute; top: 4px; right: 4px; color: var(--ve-good); font-size: 0.5rem; }
+.ve-builder-tab-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--ve-gold); box-shadow: 0 0 0 2px var(--ve-surface); }
+
+/* ---- Choosers inside a list card (spell list, spellcasting ability): label + VE segmented strip ---- */
+.ve-builder-segment-field { gap: 6px; padding-bottom: 10px; }
+.ve-builder-segment-field + .ve-builder-segment-field { padding-top: 0; }
+.ve-builder-segment-field .ve-builder-segments { background: var(--ve-surface-up); }
+.ve-builder-segment-field + :is(.ve-builder-search-row, .ve-builder-list) { margin-top: 0; }
+.ve-builder-segment-field ~ .ve-builder-search-row { padding-top: 0; }
+.ve-mobile-app .ve-builder button.ve-builder-segment:disabled:not(.is-selected) { opacity: 0.4; }
+.ve-mobile-app .ve-builder button.ve-builder-segment:disabled.is-selected { opacity: 1; cursor: default; }
+.ve-builder-grants > .ve-builder-segment-field { border-bottom: 1px solid var(--ve-border); }
+
+/* ---- Grouped chips (languages): VE's small uppercase labels over each group ---- */
+.ve-builder-chip-groups { display: grid; gap: 12px; padding: 12px 13px 13px; }
+.ve-builder-chip-group { display: grid; gap: 6px; }
+.ve-builder-trait-slot > .ve-builder-search-row + .ve-builder-chip-groups,
+.ve-builder-trait-slot > .ve-builder-search-row + .ve-builder-chips { border-top: 1px solid var(--ve-border); }
+
+/* ---- Fixed grants in a Trait step: rows with an accent check ---- */
+.ve-builder-granted ul { margin: 0; padding: 0; list-style: none; }
+.ve-builder-granted-row { min-height: 40px; padding: 6px 13px; display: flex; align-items: center; gap: 9px; font-size: 0.81rem; }
+.ve-builder-granted-row + .ve-builder-granted-row { border-top: 1px solid color-mix(in srgb, var(--ve-border) 76%, transparent); }
+.ve-builder-granted-row > i { color: var(--ve-character-accent); font-size: 0.85rem; }
+
+/* ---- A step re-opened by a conflict (creation): VE attention card ---- */
+.ve-builder-conflict .ve-section-intro { color: var(--ve-text); }
+.ve-builder-review-group li.is-conflict::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ve-gold); }
+.ve-builder-review-group li.is-conflict { color: var(--ve-gold); }
+.ve-builder-from-species { color: var(--ve-character-accent); font-weight: 700; }
+
+/* ---- Big choices (HP, roll abilities): VE rows with an icon tile ---- */
+.ve-mobile-app .ve-builder button.ve-builder-big-choice { min-height: 58px; }
+.ve-builder .ve-builder-big-choice .ve-sheet-item-art { font-size: 1.1rem; }
+.ve-builder .ve-builder-hp-total {
+  margin: 0;
+  padding: 11px 13px 12px;
+  border-top: 1px solid var(--ve-border);
+  color: var(--ve-subtle);
+  background: color-mix(in srgb, var(--ve-character-accent) 4%, var(--ve-surface));
+  font-size: 0.74rem;
+  text-align: center;
+}
+.ve-builder .ve-builder-hp-total.is-set { color: var(--ve-text); font-family: "VE Work Sans", Arial, sans-serif; font-size: 0.95rem; font-weight: 700; }
+
+/* ---- Steppers: VE's rest-dialog − value + control ---- */
+.ve-builder-stepper {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 42%, var(--ve-border));
+  border-radius: 12px 5px 12px 5px;
+  background: var(--ve-surface-up);
+}
+.ve-mobile-app .ve-builder .ve-builder-stepper button.ve-builder-step-btn {
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  color: var(--ve-character-accent);
+  background: transparent;
+  font-size: 0.95rem;
+}
+.ve-mobile-app .ve-builder .ve-builder-stepper > * + * { border-left: 1px solid var(--ve-border); }
+.ve-mobile-app .ve-builder .ve-builder-stepper button.ve-builder-step-btn:disabled { color: var(--ve-subtle); opacity: 0.4; }
+
+/* ASI (level-up): VE's ability boxes (accent label, large value) with a stepper. */
+.ve-builder-asi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 12px 12px; }
+.ve-builder-asi-cell {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 8px 6px 6px;
+  border: 1px solid var(--ve-border);
+  border-radius: 12px 5px 12px 5px;
+  background: color-mix(in srgb, var(--ve-character-accent) 4%, var(--ve-surface-up));
+}
+.ve-builder .ve-builder-asi-cell > span:first-child { color: var(--ve-character-accent); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; }
+.ve-builder .ve-builder-asi-cell > strong { font-size: 1.65rem; font-weight: 500; line-height: 1.1; }
+.ve-builder .ve-builder-asi-cell > strong.is-raised { color: var(--ve-character-accent); font-weight: 700; }
+.ve-builder .ve-builder-asi-cell > small { font-size: 0.68rem; }
+.ve-builder-asi-buttons { width: 100%; margin-top: 6px; grid-template-columns: 1fr 1fr; }
+.ve-mobile-app .ve-builder .ve-builder-asi-buttons button.ve-builder-step-btn { min-width: 0; min-height: 36px; }
+
+/* ---- Abilities (creation) ---- */
+.ve-builder .ve-builder-points {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 42%, var(--ve-border));
+  border-radius: 12px 5px 12px 5px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font-family: "VE Work Sans", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+}
+/* Number slots: VE's currency chips (small label, bold value). */
+.ve-builder-slots { padding: 0; }
+.ve-mobile-app .ve-builder .ve-builder-slots button.ve-builder-chip {
+  min-width: 52px;
+  min-height: 44px;
+  padding: 4px 10px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  border-radius: 7px;
+}
+.ve-builder .ve-builder-slots .ve-builder-chip strong { font-size: 1rem; font-weight: 700; line-height: 1.1; }
+.ve-builder .ve-builder-slots .ve-builder-chip small { color: var(--ve-gold); font-size: 0.55rem; font-weight: 900; letter-spacing: 0.05em; }
+.ve-mobile-app .ve-builder .ve-builder-chip.is-placed:not(.is-selected) { opacity: 0.55; }
+.ve-mobile-app .ve-builder :is(button, div).ve-builder-ability-row {
+  width: 100%;
+  min-height: 54px;
+  padding: 7px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-width: 0;
+  border-radius: 0;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+  text-align: left;
+}
+.ve-mobile-app .ve-builder button.ve-builder-ability-row.is-target { background: color-mix(in srgb, var(--ve-character-accent) 8%, var(--ve-surface)); }
+.ve-mobile-app .ve-builder button.ve-builder-ability-row.is-target .ve-builder-ability-name strong { text-decoration: underline dotted; text-underline-offset: 3px; }
+.ve-builder-ability-name { display: grid; gap: 1px; }
+.ve-builder .ve-builder-ability-name strong { color: var(--ve-character-accent); font-size: 0.86rem; font-weight: 800; letter-spacing: 0.04em; }
+.ve-builder .ve-builder-ability-detail { font-size: 0.68rem; }
+.ve-builder-ability-score { min-width: 52px; display: grid; justify-items: center; align-content: center; }
+.ve-builder .ve-builder-ability-score strong { font-size: 1.4rem; font-weight: 500; line-height: 1.05; }
+.ve-builder .ve-builder-ability-score small { font-size: 0.65rem; }
+.ve-builder-stepper .ve-builder-ability-score { min-width: 54px; padding: 3px 0; }
+.ve-builder-step-raise { display: grid; justify-items: end; gap: 3px; }
+.ve-builder .ve-builder-step-cost { padding-right: 2px; color: var(--ve-gold); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
+.ve-builder .ve-builder-step-cost.is-off { color: var(--ve-subtle); }
+.ve-builder-enter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 12px 12px; }
+
+/* ---- Equipment ---- */
+.ve-builder-book { border-top: 1px solid var(--ve-border); }
+.ve-builder .ve-builder-book > summary { min-height: 44px; }
+.ve-builder .ve-builder-book > summary > span { font-size: 0.78rem; }
+.ve-builder-book > p { margin: 0; padding: 0 13px 12px 40px; color: var(--ve-subtle); font-size: 0.74rem; line-height: 1.45; }
+.ve-builder-pick { display: grid; gap: 6px; }
+.ve-builder-card-text-block { padding: 12px 13px; }
+
+.ve-builder-book-text { margin: 0; padding: 0 14px 12px; color: var(--ve-text); font-size: 0.78rem; line-height: 1.45; white-space: pre-line; }
+.ve-builder-trait-slot > .ve-builder-only-option { padding-bottom: 0; color: var(--ve-text); }
+
+/* ---- Item grants ---- */
+.ve-mobile-app .ve-builder label.ve-builder-grant { cursor: pointer; }
+.ve-builder-grant input { width: 18px; height: 18px; margin: 0; accent-color: var(--ve-character-accent); }
+
+/* ---- Review, done and history: VE cards with rows ---- */
+.ve-builder-review-group ul { margin: 0; padding: 0; list-style: none; }
+.ve-builder-review-group li {
+  min-height: 40px;
+  padding: 5px 8px 5px 13px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.81rem;
+  line-height: 1.3;
+}
+.ve-builder-review-group li + li { border-top: 1px solid color-mix(in srgb, var(--ve-border) 76%, transparent); }
+.ve-builder-review-group li > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* Gains, losses and warnings: a small coloured dot before the line. */
+.ve-builder-review-group li:is(.is-gain, .is-loss, .is-warning)::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.ve-builder-review-group li.is-gain::before { background: var(--ve-good, #8fbd52); }
+.ve-builder-review-group li.is-loss::before { background: var(--ve-red-bright); }
+.ve-builder-review-group li.is-warning::before { background: var(--ve-gold); }
+.ve-builder-review-group li.is-warning { color: var(--ve-gold); }
+.ve-builder-attention li.is-note span { color: var(--ve-subtle); }
+.ve-builder-attention { border-color: color-mix(in srgb, var(--ve-gold) 55%, var(--ve-border)); }
+.ve-builder-attention .ve-sheet-card-heading { background: color-mix(in srgb, var(--ve-gold) 8%, var(--ve-surface)); }
+.ve-builder-attention .ve-sheet-card-heading > i { color: var(--ve-gold); }
+/* "Change ›": VE's card action, sized for a row. */
+.ve-mobile-app .ve-builder button.ve-sheet-card-action { flex: none; min-height: 32px; padding: 4px 4px 4px 8px; color: var(--ve-subtle); font-size: 0.78rem; font-weight: 800; }
+.ve-mobile-app .ve-builder button.ve-sheet-card-action i { font-size: 0.6rem; }
+/* History: VE's collapsible group header. */
+.ve-builder-history > summary {
+  min-height: 54px;
+  padding: 9px 13px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  list-style: none;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--ve-character-accent) 4%, var(--ve-surface));
+}
+.ve-builder-history > summary::-webkit-details-marker { display: none; }
+.ve-builder-history > summary > i { color: var(--ve-character-accent); transition: transform 150ms ease; }
+.ve-builder-history[open] > summary > i { transform: rotate(90deg); }
+.ve-builder-history > summary > span { display: grid; gap: 2px; min-width: 0; }
+.ve-builder .ve-builder-history > summary strong { font-size: 0.91rem; font-weight: 800; }
+.ve-builder .ve-builder-history > summary small { font-size: 0.65rem; }
+.ve-builder-history-groups { display: grid; gap: 10px; padding: 10px; border-top: 1px solid var(--ve-border); background: var(--ve-bg); }
+
+/* ---- Spells (Phase 3) ---- */
+/* Counters: VE's header vitals strip (gold label, value). */
+.ve-builder-spell-counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--ve-border);
+  border-radius: 14px;
+  background: var(--ve-surface);
+}
+.ve-builder-spell-counter { display: grid; justify-items: center; gap: 2px; padding: 8px 6px; }
+.ve-builder-spell-counter + .ve-builder-spell-counter { border-left: 1px solid var(--ve-border); }
+.ve-builder .ve-builder-spell-counter small { color: color-mix(in srgb, var(--ve-gold) 90%, var(--ve-text)); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; }
+.ve-builder .ve-builder-spell-counter strong { font-size: 1.15rem; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ve-builder .ve-builder-spell-counter.is-done strong { color: var(--ve-character-accent); font-weight: 700; }
+.ve-builder-spell-filters { border-top: 1px solid var(--ve-border); }
+.ve-builder-spell-filters + .ve-builder-spell-list { border-top: 1px solid var(--ve-border); }
+.ve-builder-spell-row { display: grid; grid-template-columns: minmax(0, 1fr) 50px; align-items: stretch; background: var(--ve-surface); }
+.ve-builder-spell-list > .ve-builder-spell-row:not([hidden]) ~ .ve-builder-spell-row:not([hidden]) { border-top: 1px solid color-mix(in srgb, var(--ve-border) 76%, transparent); }
+.ve-builder-spell-list > * + .ve-builder-empty { border-top: 1px solid var(--ve-border); }
+.ve-mobile-app .ve-builder button.ve-builder-spell-check {
+  margin: 8px 10px 8px 0;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--ve-border);
+  border-radius: 9px;
+  color: var(--ve-subtle);
+  background: var(--ve-surface-up);
+  font-size: 0.9rem;
+}
+.ve-mobile-app .ve-builder button.ve-builder-spell-check:disabled { opacity: 0.4; }
+.ve-mobile-app .ve-builder .ve-builder-spell-row.is-selected { background: color-mix(in srgb, var(--ve-character-accent) 12%, var(--ve-surface)); }
+.ve-mobile-app .ve-builder .ve-builder-spell-row.is-selected button.ve-builder-spell-open { background: transparent; }
+.ve-builder .ve-builder-spell-row.is-selected .ve-sheet-item-copy strong { color: var(--ve-character-accent); }
+.ve-builder .ve-builder-spell-row.is-selected .ve-sheet-item-art { border-color: var(--ve-character-accent); }
+.ve-mobile-app .ve-builder .ve-builder-spell-row.is-selected button.ve-builder-spell-check {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 58%, var(--ve-border));
+  color: #fff;
+  background: color-mix(in srgb, var(--ve-character-accent) 72%, #351019);
+}
+.ve-builder-spell-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; }
+.ve-builder-spell-tags:empty { display: none; }
+.ve-builder .ve-builder-tag { padding: 0 6px; border: 1px solid var(--ve-border); border-radius: 6px; color: var(--ve-subtle); background: var(--ve-surface-up); font-size: 0.58rem; font-weight: 750; }
+/* Swaps: VE's collapsible group in a card. */
+.ve-builder .ve-builder-spell-swap { border-top: 1px solid var(--ve-border); }
+.ve-builder .ve-builder-spell-swap > summary > b { color: var(--ve-character-accent); background: transparent; }
+.ve-builder-spell-swap > .ve-builder-spell-list { border-top: 1px solid var(--ve-border); }
+/* The Pick / Unpick bar at the bottom of VE's item window. */
+.ve-builder-spell-pick-bar { position: sticky; z-index: 2; bottom: 0; display: flex; margin-top: 12px; padding: 12px 0 max(12px, var(--ve-safe-bottom, 0px)); border-top: 1px solid var(--ve-border); background: var(--ve-bg); }
+
+/* Character sheet (fork): the spell's book badge is a Prepare / Unprepare toggle. Same look as VE's
+   status icon, with a larger touch target. */
+.ve-mobile-app .ve-item-status.ve-prepare-toggle {
+  box-sizing: content-box; width: 18px; height: 22px; min-width: 0; min-height: 0; margin: -9px -6px; padding: 9px 6px;
+  border: 0; border-radius: 8px; background: none; box-shadow: none; appearance: none; cursor: pointer;
+  /* Foundry's button styles would make the badge white and larger; keep VE's status icon look. */
+  color: var(--ve-subtle); font-size: 0.67rem; line-height: 1;
+}
+.ve-mobile-app .ve-item-status.ve-prepare-toggle.is-active { color: var(--ve-character-accent); }
+.ve-mobile-app .ve-item-status.ve-prepare-toggle i { font-size: inherit; color: inherit; }
+.ve-mobile-app .ve-item-status.ve-prepare-toggle:focus-visible { outline: 2px solid var(--ve-character-accent, var(--ve-gold)); outline-offset: -2px; }
+.ve-mobile-app .ve-item-status.ve-prepare-toggle:disabled { opacity: 0.5; cursor: progress; }
+
+/* Character chooser (fork): "New character" uses the same row as VE's character rows. */
+.ve-mobile-app button.ve-character-menu-new {
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  margin: 0 0 4px;
+  padding: 7px 9px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 11px;
+  border: 0;
+  border-bottom: 1px solid var(--ve-border);
+  border-radius: 0;
+  color: var(--ve-text);
+  background: transparent;
+  text-align: left;
+}
+.ve-mobile-app .ve-character-menu-new .ve-character-menu-portrait { display: grid; place-items: center; color: var(--ve-character-accent, var(--ve-gold)); font-size: 1.05rem; }
+
+/* GM settings windows on desktop (Character Builder: Sources / House Rules) */
+/* Foundry clips .window-content, so the body is the scroller and the footer stays pinned. */
+.ve-builder-settings .window-content { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.ve-builder-settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 12px 12px 0; }
+.ve-builder-settings-body fieldset { margin: 0; padding: 8px 10px 10px; }
+.ve-builder-settings-body .hint { margin: 0 0 6px; opacity: 0.8; font-size: 0.85em; }
+.ve-builder-settings-body table { width: 100%; border-collapse: collapse; }
+.ve-builder-settings-body th { text-align: left; font-size: 0.8em; opacity: 0.8; }
+.ve-builder-settings-body td { padding: 3px 4px; vertical-align: middle; }
+.ve-builder-settings-body td small { opacity: 0.65; }
+.ve-builder-settings-body td input[type=number] { width: 64px; }
+.ve-builder-settings-books { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; }
+.ve-builder-settings-books label, .ve-builder-settings-class label { display: flex; align-items: center; gap: 6px; }
+.ve-builder-settings-class { grid-column: 1 / -1; margin-bottom: 6px; }
+.ve-builder-settings-sub { margin-left: 24px; }
+.ve-builder-settings-check { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
+.ve-builder-settings-types [hidden] { display: none !important; }
+.ve-builder-settings-type-pick { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
+.ve-builder-settings-type-pick select { flex: 0 1 240px; }
+.ve-builder-settings-type-lists { margin: 6px 0 0 26px; }
+.ve-builder-settings-type-lists h4 { margin: 8px 0 4px; font-size: 0.9em; border: none; }
+.ve-builder-settings-check span { display: grid; }
+.ve-builder-settings-check small { opacity: 0.75; }
+.ve-builder-settings-body .form-footer { position: sticky; bottom: 0; z-index: 1; display: flex; gap: 8px; margin: auto -12px 0; padding: 10px 12px; border-top: 1px solid var(--color-border, rgb(255 255 255 / 0.15)); background: var(--background, var(--color-cool-5, #1b1a22)); }
+
+/* ---- Picker rows: the book subtitle with the edition / tier chip ("5.5e Core", "5e Expanded", "3rd party", "Homebrew").
+   VE's small badge look (the spell tags' 6px radius, bold small text); toned by tier: 5.5e Core accent-tinted,
+   5.5e Expanded accent outline, 5e muted, 3rd party / Homebrew solid gold. ---- */
+.ve-builder .ve-builder-card-meta { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.ve-builder .ve-builder-card-meta > small { min-width: 0; }
+.ve-builder .ve-builder-tier {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--ve-border);
+  border-radius: 6px;
+  color: var(--ve-subtle);
+  background: var(--ve-surface-up);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.ve-builder .ve-builder-tier.is-core55 {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 55%, var(--ve-border));
+  color: var(--ve-character-accent);
+  background: color-mix(in srgb, var(--ve-character-accent) 16%, var(--ve-surface-up));
+}
+.ve-builder .ve-builder-tier.is-expanded55 {
+  border-color: color-mix(in srgb, var(--ve-character-accent) 60%, var(--ve-border));
+  color: var(--ve-character-accent);
+  background: transparent;
+}
+/* 3rd party / Homebrew: solid gold, so it stays apart from Core / Expanded even when the character's accent is gold. */
+.ve-builder .ve-builder-tier.is-other {
+  border-color: var(--ve-gold);
+  color: #1d1a14; /* dark on gold in both themes */
+  background: var(--ve-gold);
+}
+
+/* ---- Phase 4b: GM approval ---- */
+/* Desktop window: VE's tokens are aliased on .ve-mobile-app only (the base --ve-ink / --ve-panel… are on :root). */
+.ve-builder-approval-window .window-content { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+/* .ve-builder.ve-builder-approval: beats the unscoped .ve-builder page rule (640px column, full height, shadow) and
+   .ve-character-screen's grid. The font is the builder layer's (.ve-builder-layer), which this window doesn't have.
+   The accent stays .ve-character-screen's default (red), as on the phone layer (createShell without a sheet accent). */
+.ve-builder.ve-builder-approval {
+  --ve-bg: var(--ve-ink); --ve-surface: var(--ve-panel); --ve-surface-up: var(--ve-panel-up); --ve-border: var(--ve-line);
+  --ve-text: var(--ve-paper); --ve-subtle: var(--ve-muted);
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  width: auto; height: auto; margin: 0; box-shadow: none;
+  color: var(--ve-text); background: var(--ve-bg);
+  font: 400 16px/1.4 "Roboto Condensed", Arial, sans-serif;
+}
+/* Foundry's own button / textarea fonts (Signika, monospace) would win over the inherited one. */
+.ve-builder.ve-builder-approval :is(button, textarea, input) { font-family: inherit; }
+.ve-builder-approval-subtitle { margin: 0; color: var(--ve-subtle); font-weight: 600; }
+.ve-builder-approval-body { display: flex; flex-direction: column; gap: 10px; }
+/* The send-back card has no inner padding (VE card body rows do their own): inset the field like a row. */
+.ve-builder .ve-builder-approval-reject textarea.ve-builder-approval-reason { width: calc(100% - 24px); min-height: 4.5em; margin: 12px 12px 10px; }
+/* bottom: -12px + padding: the bar also covers the window's bottom padding, so no card edge shows beneath it. */
+.ve-builder-approval-actions { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: -12px; padding: 8px 0 12px; background: var(--ve-bg); }
+/* The waiting card has no rows of its own: inset its text and Withdraw like the draft card's. */
+.ve-builder .ve-builder-waiting { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
+.ve-builder-waiting .ve-builder-lead { margin: 0; }
+.ve-builder-sent-back li span { font-style: italic; }
+.ve-builder-row-badge { display: block; font-size: 0.8em; color: var(--ve-subtle); }
+.ve-builder-row-badge.is-submitted { color: var(--ve-gold); }
+.ve-builder-row-badge.is-rejected { color: var(--ve-red-bright, var(--ve-red)); }

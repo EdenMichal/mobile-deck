@@ -1,0 +1,2607 @@
+{
+ "note": "Samples shaped like a DDB Importer / homebrew world-pack export (creation data fix stage A). Every description is invented sample text; names, books, equipment entries, table links and advancements keep the shape the rules read.",
+ "backgrounds": [
+  {
+   "_id": "LB1IX6o6AdEgIGDZ",
+   "name": "Noble",
+   "type": "background",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB 2024",
+     "rules": "2024"
+    },
+    "identifier": "background-noble",
+    "advancement": {
+     "DjHmTBT4fAprv3rT": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [],
+       "grants": [
+        "skills:his",
+        "skills:per"
+       ],
+       "mode": "default"
+      },
+      "_id": "DjHmTBT4fAprv3rT",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Skill Proficiencies",
+      "value": {}
+     },
+     "gs8bQzDf2wZVruSI": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-feats.Item.zK524EWewz7ZRyZU",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": null
+      },
+      "_id": "gs8bQzDf2wZVruSI",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Feat",
+      "value": {}
+     }
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<h1>Background: Noble</h1><p></p><p><strong>Ability Scores:</strong> Strength, Intelligence, Charisma<br><strong>Feat:</strong> Skilled<br><strong>Skill Proficiencies:</strong> &amp;Reference[his]{History} and &amp;Reference[per]{Persuasion}<br><strong>Tool Proficiency:</strong> <em>Choose one kind of Gaming Set</em><br><strong>Equipment:</strong> <em>Choose A or B:</em> (A) Gaming Set (same as above), Fine Clothes, Perfume, 29 GP; or (B) 50 GP</p> <p>Sample text. You grew up in a house with a crest over the door and a long table where everyone knew their seat.</p><p></p><h2>Skilled</h2>\n</div>"
+    },
+    "startingEquipment": [
+     {
+      "type": "OR",
+      "group": "",
+      "_id": "hDhcqvaWidGS1RBA",
+      "requiresProficiency": false,
+      "sort": 100000
+     },
+     {
+      "type": "AND",
+      "group": "hDhcqvaWidGS1RBA",
+      "_id": "vKsKrr92IEeXJgNY",
+      "requiresProficiency": false,
+      "sort": 200000
+     },
+     {
+      "type": "tool",
+      "count": null,
+      "key": "game",
+      "group": "vKsKrr92IEeXJgNY",
+      "_id": "UrPNaUF3lw93F8hK",
+      "requiresProficiency": false,
+      "sort": 300000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.pjxpIVbJEfOvM240",
+      "group": "vKsKrr92IEeXJgNY",
+      "_id": "0mPtgb0ttnvEzI2B",
+      "requiresProficiency": false,
+      "sort": 400000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagPerfume0000",
+      "group": "vKsKrr92IEeXJgNY",
+      "_id": "ytnjpm1A175wL4a2",
+      "requiresProficiency": false,
+      "sort": 500000
+     },
+     {
+      "type": "currency",
+      "count": 29,
+      "key": "gp",
+      "group": "vKsKrr92IEeXJgNY",
+      "_id": "nqIwhNfTp5Dpi9TA",
+      "requiresProficiency": false,
+      "sort": 600000
+     },
+     {
+      "type": "AND",
+      "group": "hDhcqvaWidGS1RBA",
+      "_id": "tlNvZWygX9DnwTGa",
+      "requiresProficiency": false,
+      "sort": 700000
+     },
+     {
+      "type": "currency",
+      "count": 50,
+      "key": "gp",
+      "group": "tlNvZWygX9DnwTGa",
+      "_id": "OxxKIhWP0xCn5N7E",
+      "requiresProficiency": false,
+      "sort": 800000
+     }
+    ]
+   }
+  },
+  {
+   "_id": "UsNj3I9maKphVE7Z",
+   "name": "Night Stalker",
+   "type": "background",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "TCMP1",
+     "rules": "2024"
+    },
+    "identifier": "background-night-stalker",
+    "advancement": {
+     "6PB4R3EkN819Sprw": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [],
+       "grants": [
+        "skills:ste"
+       ],
+       "mode": "default"
+      },
+      "_id": "6PB4R3EkN819Sprw",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Skill Proficiencies",
+      "value": {}
+     },
+     "XfTOi4hsLmpZDvjU": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [],
+       "grants": [
+        "tool:art:leatherworker"
+       ],
+       "mode": "default"
+      },
+      "_id": "XfTOi4hsLmpZDvjU",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Tool Proficiencies",
+      "value": {}
+     },
+     "eklIKjGoEr4TbWHK": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-feats.Item.mCtctmtfDfKmFxs8",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": null
+      },
+      "_id": "eklIKjGoEr4TbWHK",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Feat",
+      "value": {}
+     }
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<h1>Background: Night Stalker</h1><p></p><p>Sample text. Something hunted you once, and you lived. Now you keep a lantern lit and a list of names.</p> <div class=\"line character height1 marginTop20 marginBottom20\"> </div> <dl class=\"revised-phb-backgrounds\"> <dt><strong>Feat: </strong> Lantern Oath</dt> <dt><strong>Skill Proficiencies: </strong>&amp;Reference[ste]{Stealth}, and one other of your choice from the following list: &amp;Reference[arc]{Arcana}, &amp;Reference[his]{History}, &amp;Reference[rel]{Religion}, &amp;Reference[nat]{Nature} </dt> <dt><strong>Tool Proficiencies:</strong> Leatherworker’s Tools</dt> <dt><strong>Equipment:</strong><em>Choose A or B: (A) Leatherworker’s Tools, Book (one creature type), Hooded Lantern, Hunting Trap, Oil (3 flasks), Traveler’s Clothes, 8 GP; or (B) 50 GP</em></dt> </dl> <div class=\"line character height1 marginTop20 marginBottom20\"> </div> <h3 class=\"comepndium-hr\">Building a Night Stalker</h3> <p>Sample text. Decide what hunted you and why you stopped running.</p> <p><em><strong>Suggested Story Threads.</strong> </em>Sample text. Roll on the story threads table for a hook.</p> <div id=\"table-link\">@UUID[Compendium.world.ddb-campaign-ddb-tables.RollTable.9JQLoaHb8j4JVnBj]{Open RollTable Background: Night Stalker: Suggested Story Threads}</div> <p><em><strong>Night Stalker Trinkets.</strong> </em>Sample text. You can roll on this table instead of the usual trinkets table.</p> <div id=\"table-link\">@UUID[Compendium.world.ddb-campaign-ddb-tables.RollTable.GmvkvtpBNGHmeKe2]{Open RollTable Background: Night Stalker: Night Stalker Trinkets}</div><p></p><h2>Lantern Oath</h2>\n</div>"
+    },
+    "startingEquipment": []
+   }
+  },
+  {
+   "_id": "FG3AFqSTMgmOhNvl",
+   "name": "Urchin",
+   "type": "background",
+   "flags": {
+    "ddbimporter": {
+     "is2014": true,
+     "is2024": false,
+     "legacy": true
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB",
+     "rules": "2014"
+    },
+    "identifier": "background-urchin",
+    "advancement": {
+     "IYlQLUTjfGsf613J": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [],
+       "grants": [
+        "skills:slt",
+        "skills:ste"
+       ],
+       "mode": "default"
+      },
+      "_id": "IYlQLUTjfGsf613J",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Skill Proficiencies",
+      "value": {}
+     },
+     "jk7Yla575SE9mrx2": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [],
+       "grants": [
+        "tool:disg",
+        "tool:thief"
+       ],
+       "mode": "default"
+      },
+      "_id": "jk7Yla575SE9mrx2",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Tool Proficiencies",
+      "value": {}
+     }
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<h1>Background: Urchin</h1><p></p><p class=\"Core-Styles_Core-Body\">Sample text. You learned the city from its gutters up, and you still know which roofs hold your <span class=\"No-Break\">weight.</span></p> <div class=\"line character height1 marginTop20 marginBottom20\"> </div> <p class=\"Core-Styles_Core-Hanging\"><strong><span class=\"Serif-Character-Style_Bold-Serif\">Skill Proficiencies:</span></strong> Sleight o<span class=\"No-Break\">f Hand, &amp;Reference[ste]{Stealth}<br></span><strong><span class=\"Serif-Character-Style_Bold-Serif\">Tool Proficiencies:</span></strong> Disguise kit,<span class=\"No-Break\"> thieves’ tools<br></span><strong><span class=\"Serif-Character-Style_Bold-Serif\">Equipment: </span></strong>A small knife, a map of your home city, a keepsake, a set of common clothes, and a pouch c<span class=\"No-Break\">ontaining 10 gp</span></p> <div class=\"line character height1 marginTop20 marginBottom20\"> </div> <blockquote> <p class=\"compendium-hr\"><strong>FEATURE: BACK ALLEYS</strong> </p> <p class=\"compendium-hr\">Sample text. Out of combat, you find quick routes through a city.</p> </blockquote> <div class=\"line character height1 marginTop20 marginBottom20\"> </div> <h5 class=\"compendium-hr\">Suggested Characteristics</h5> <p class=\"Core-Styles_Core-Body\">Sample text. Roll or choose on the tables below.</p> <div id=\"table-link\">@UUID[Compendium.world.ddb-campaign-ddb-tables.RollTable.MRKvAqGnEI9Z0DBq]{Open RollTable Background: Urchin: Personality Trait}</div> <div id=\"table-link\">@UUID[Compendium.world.ddb-campaign-ddb-tables.RollTable.Z8VmNhXLDWkwnhQI]{Open RollTable Background: Urchin: Ideal}</div> <div id=\"table-link\">@UUID[Compendium.world.ddb-campaign-ddb-tables.RollTable.kZ8aVM4wn9AbBylV]{Open RollTable Background: Urchin: Bond}</div> <div id=\"table-link\">@UUID[Compendium.world.ddb-campaign-ddb-tables.RollTable.k4yDx1qVLzoNskGo]{Open RollTable Background: Urchin: Flaw}</div><p></p><h2>Back Alleys</h2><p>Sample text. Out of combat, you find quick routes through a city.</p>\n</div>"
+    },
+    "startingEquipment": [
+     {
+      "type": "AND",
+      "group": "",
+      "_id": "EBMzWf6WKI9WBvsF",
+      "requiresProficiency": false,
+      "sort": 100000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbwepDagger0000",
+      "group": "EBMzWf6WKI9WBvsF",
+      "_id": "Uxc30U3jJzx0ulyG",
+      "requiresProficiency": false,
+      "sort": 200000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagClothesTrav",
+      "group": "EBMzWf6WKI9WBvsF",
+      "_id": "OH7SoxPb3J7t5lu1",
+      "requiresProficiency": false,
+      "sort": 300000
+     },
+     {
+      "type": "currency",
+      "count": 10,
+      "key": "gp",
+      "group": "EBMzWf6WKI9WBvsF",
+      "_id": "LuXoqf8tilTPTyS4",
+      "requiresProficiency": false,
+      "sort": 400000
+     }
+    ]
+   }
+  },
+  {
+   "_id": "1hKUUa8bIZmdF6Ow",
+   "name": "Sailor",
+   "type": "background",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB 2024",
+     "rules": "2024"
+    },
+    "identifier": "background-sailor",
+    "advancement": {
+     "Cpry5iBhz8qjzFAW": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [],
+       "grants": [
+        "skills:acr",
+        "skills:prc"
+       ],
+       "mode": "default"
+      },
+      "_id": "Cpry5iBhz8qjzFAW",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Skill Proficiencies",
+      "value": {}
+     },
+     "4CkgC22u0ZssTo10": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-feats.Item.3XkSOg5VXOMf56sg",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": null
+      },
+      "_id": "4CkgC22u0ZssTo10",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Feat",
+      "value": {}
+     }
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<h1>Background: Sailor</h1><p></p><p><strong>Ability Scores:</strong> Strength, Dexterity, Wisdom<br><strong>Feat:</strong> Tavern Brawler<br><strong>Skill Proficiencies:</strong> &amp;Reference[acr]{Acrobatics} and &amp;Reference[prc]{Perception}<br><strong>Tool Proficiency:</strong> Navigator's Tools<br><strong>Equipment:</strong> <em>Choose A or B:</em> (A) Dagger, Navigator's Tools, Rope, Traveler's Clothes, 20 GP; or (B) 50 GP</p> <p>Sample text. You worked the decks of a trading ship and can still tie a knot in the dark.</p><p></p><h2>Tavern Brawler</h2>\n</div>"
+    },
+    "startingEquipment": [
+     {
+      "type": "OR",
+      "group": "",
+      "_id": "AAFWdTr4JZio9Vdw",
+      "requiresProficiency": false,
+      "sort": 100000
+     },
+     {
+      "type": "AND",
+      "group": "AAFWdTr4JZio9Vdw",
+      "_id": "2mIucoRBFY3ld6oh",
+      "requiresProficiency": false,
+      "sort": 200000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbwepDagger0000",
+      "group": "2mIucoRBFY3ld6oh",
+      "_id": "uSByV24X0WRyicaW",
+      "requiresProficiency": false,
+      "sort": 300000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbtulNavigators",
+      "group": "2mIucoRBFY3ld6oh",
+      "_id": "VpP55kEYkhhQcXew",
+      "requiresProficiency": false,
+      "sort": 400000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.5KMKEV07I25SVth0",
+      "group": "2mIucoRBFY3ld6oh",
+      "_id": "A6OhEJs5O7xp35kK",
+      "requiresProficiency": false,
+      "sort": 500000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagClothesTrav",
+      "group": "2mIucoRBFY3ld6oh",
+      "_id": "sOsYFKbsEn7SBBpe",
+      "requiresProficiency": false,
+      "sort": 600000
+     },
+     {
+      "type": "currency",
+      "count": 20,
+      "key": "gp",
+      "group": "2mIucoRBFY3ld6oh",
+      "_id": "8l9RTROZaiJrQyNt",
+      "requiresProficiency": false,
+      "sort": 700000
+     },
+     {
+      "type": "AND",
+      "group": "AAFWdTr4JZio9Vdw",
+      "_id": "0PlSvGZWItAKWtM7",
+      "requiresProficiency": false,
+      "sort": 800000
+     },
+     {
+      "type": "currency",
+      "count": 50,
+      "key": "gp",
+      "group": "0PlSvGZWItAKWtM7",
+      "_id": "xArS1KJ6IuVhqpni",
+      "requiresProficiency": false,
+      "sort": 900000
+     }
+    ]
+   }
+  },
+  {
+   "_id": "5Pzv5CjxyGegeyQJ",
+   "name": "Investigator",
+   "type": "background",
+   "flags": {},
+   "system": {
+    "source": {
+     "book": "Ravenloft: The Horrors Within",
+     "rules": "2024"
+    },
+    "identifier": "background-investigator",
+    "advancement": {
+     "Ml4TG6iD2yqgn9dM": {
+      "_id": "Ml4TG6iD2yqgn9dM",
+      "type": "AbilityScoreImprovement",
+      "flags": {},
+      "level": 0,
+      "title": "Background Ability Score Improvement",
+      "hint": "Increase one of Intelligence, Wisdom, or Charisma by 2 and another by 1, or all three by 1 (max 20).",
+      "configuration": {
+       "cap": 2,
+       "fixed": {
+        "str": 0,
+        "dex": 0,
+        "con": 0,
+        "int": 0,
+        "wis": 0,
+        "cha": 0
+       },
+       "locked": [
+        "str",
+        "dex",
+        "con"
+       ],
+       "points": 3
+      },
+      "value": {}
+     },
+     "0nG5CUDsTgDAa9yk": {
+      "_id": "0nG5CUDsTgDAa9yk",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Background Proficiencies",
+      "configuration": {
+       "mode": "default",
+       "allowReplacements": false,
+       "grants": [
+        "skills:ins",
+        "skills:inv",
+        "tool:disg"
+       ],
+       "choices": []
+      },
+      "value": {}
+     },
+     "ED5AuJa9mYYNAjqk": {
+      "_id": "ED5AuJa9mYYNAjqk",
+      "type": "ItemChoice",
+      "flags": {},
+      "level": 0,
+      "hint": "Gain a background feat of your choice from this book (GM's permission).",
+      "title": "Background Feat",
+      "configuration": {
+       "hint": "Gain a background feat of your choice from this book (GM's permission).",
+       "choices": {
+        "0": {
+         "count": 1
+        }
+       },
+       "allowDrops": false,
+       "type": "feat",
+       "pool": [
+        "Compendium.world.homebrew-rthw-feats.Item.zCZLVZgDZVKbDegU",
+        "Compendium.world.homebrew-rthw-feats.Item.asy334V9mrU6OjnX",
+        "Compendium.world.homebrew-rthw-feats.Item.WdMC4U4aY1RK3jIB",
+        "Compendium.world.homebrew-rthw-feats.Item.w7rDDQaxpeh5tMZG",
+        "Compendium.world.homebrew-rthw-feats.Item.bpxRlVv7oQwkNxyo",
+        "Compendium.world.homebrew-rthw-feats.Item.OrYznCVuE8IrxTm5",
+        "Compendium.world.homebrew-rthw-feats.Item.VaG9LIJ2JzdGQyck",
+        "Compendium.world.homebrew-rthw-feats.Item.DvS5skFhwoqkmP5i",
+        "Compendium.world.homebrew-rthw-feats.Item.M8cyPgYUjnxOND20",
+        "Compendium.world.homebrew-rthw-feats.Item.HBvUzMsCeUExexY2"
+       ],
+       "spell": null,
+       "restriction": {
+        "type": "",
+        "subtype": "",
+        "level": ""
+       }
+      },
+      "value": {}
+     }
+    },
+    "description": {
+     "value": "<div class=\"rthw\"><p><strong>Ability Scores:</strong> Intelligence, Wisdom, Charisma</p><p><strong>Feat:</strong> a background feat of your choice</p><p><strong>Skill Proficiencies:</strong> Insight and Investigation</p><p><strong>Tool Proficiency:</strong> Disguise Kit</p><p><strong>Equipment:</strong> <em>Choose A or B:</em> (A) Disguise Kit, Manacles, Shovel, Traveler's Clothes, 3 Vials, and 16 GP; or (B) 50 GP</p><p>Sample text. You ask the question nobody else in the room wants answered.</p><hr><p><em>Source: sample homebrew text for the unit tests.</em></p></div>"
+    },
+    "startingEquipment": [
+     {
+      "type": "OR",
+      "_id": "E9P0hUsh93rA5214",
+      "group": "",
+      "requiresProficiency": false,
+      "sort": 100000
+     },
+     {
+      "type": "AND",
+      "_id": "40KpyZEw7PL2hZgf",
+      "group": "E9P0hUsh93rA5214",
+      "requiresProficiency": false,
+      "sort": 200000
+     },
+     {
+      "type": "AND",
+      "_id": "ysvWgq8K6T0EcI3B",
+      "group": "E9P0hUsh93rA5214",
+      "requiresProficiency": false,
+      "sort": 300000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbtulDisguiseKi",
+      "group": "40KpyZEw7PL2hZgf",
+      "requiresProficiency": false,
+      "_id": "GYrGay1nUCOQr0Kg",
+      "sort": 211000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagManacles000",
+      "group": "40KpyZEw7PL2hZgf",
+      "requiresProficiency": false,
+      "_id": "NPpeU9IG9uHfFwrF",
+      "sort": 212000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagShovel00000",
+      "group": "40KpyZEw7PL2hZgf",
+      "requiresProficiency": false,
+      "_id": "f2k8mz6opSUEai0N",
+      "sort": 213000
+     },
+     {
+      "type": "linked",
+      "count": null,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagClothesTrav",
+      "group": "40KpyZEw7PL2hZgf",
+      "requiresProficiency": false,
+      "_id": "8Z0gEWxWV64DIPub",
+      "sort": 214000
+     },
+     {
+      "type": "linked",
+      "count": 3,
+      "key": "Compendium.dnd5e.equipment24.Item.phbagVial0000000",
+      "group": "40KpyZEw7PL2hZgf",
+      "requiresProficiency": false,
+      "_id": "xeJf2ncn5gDSLhsV",
+      "sort": 215000
+     },
+     {
+      "type": "currency",
+      "count": 16,
+      "key": "gp",
+      "group": "40KpyZEw7PL2hZgf",
+      "requiresProficiency": false,
+      "_id": "kSDyRlbIE9qdVmNT",
+      "sort": 216000
+     },
+     {
+      "type": "currency",
+      "count": 50,
+      "key": "gp",
+      "group": "ysvWgq8K6T0EcI3B",
+      "requiresProficiency": false,
+      "_id": "Hbh76doeWoSs64O8",
+      "sort": 310000
+     }
+    ],
+    "wealth": "50"
+   }
+  }
+ ],
+ "species": [
+  {
+   "_id": "RrclSKFpVXiCgxkI",
+   "name": "Goliath",
+   "type": "race",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB 2024",
+     "rules": ""
+    },
+    "identifier": "goliath",
+    "advancement": {
+     "31CA8eTgEdxkbRAA": {
+      "configuration": {
+       "sizes": [
+        "med"
+       ]
+      },
+      "_id": "31CA8eTgEdxkbRAA",
+      "type": "Size",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     },
+     "tFyJL5wPzjRbNDC1": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 2,
+         "pool": [
+          "languages:standard:*"
+         ]
+        }
+       ],
+       "grants": [
+        "languages:languages:standard:common"
+       ],
+       "mode": "default"
+      },
+      "_id": "tFyJL5wPzjRbNDC1",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Languages",
+      "value": {}
+     },
+     "CsV2BZNYXCmkVZh8": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-species.Item.3qtZDAtgNhxd7R28",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": null
+      },
+      "_id": "CsV2BZNYXCmkVZh8",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Traits",
+      "value": {}
+     }
+    }
+   }
+  },
+  {
+   "_id": "AGfQ0btTMYx0sVwu",
+   "name": "Shadar-kai",
+   "type": "race",
+   "flags": {
+    "ddbimporter": {
+     "is2014": true,
+     "is2024": false,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "MotM",
+     "rules": ""
+    },
+    "identifier": "shadar-kai",
+    "advancement": {
+     "b1Z6qsVbCznKfABA": {
+      "configuration": {
+       "sizes": [
+        "med"
+       ]
+      },
+      "_id": "b1Z6qsVbCznKfABA",
+      "type": "Size",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     },
+     "pkMA7Yc1KvjFSIL1": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 1,
+         "pool": [
+          "languages:*"
+         ]
+        }
+       ],
+       "grants": [
+        "languages:common"
+       ],
+       "mode": "default"
+      },
+      "_id": "pkMA7Yc1KvjFSIL1",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Languages",
+      "value": {}
+     },
+     "LhzxFpahLl64bGIi": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 1,
+         "pool": [
+          "skills:prc"
+         ]
+        }
+       ],
+       "grants": [],
+       "mode": "default"
+      },
+      "_id": "LhzxFpahLl64bGIi",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Keen Senses",
+      "value": {}
+     },
+     "YcJGlScCANa5rvlw": {
+      "configuration": {
+       "allowReplacements": false,
+       "choices": [],
+       "grants": [
+        "dr:necrotic"
+       ],
+       "mode": "default"
+      },
+      "_id": "YcJGlScCANa5rvlw",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Necrotic Resistance",
+      "value": {}
+     },
+     "gtHXxwXsTtlNe0fg": {
+      "configuration": {
+       "cap": 2,
+       "fixed": {},
+       "locked": [],
+       "points": 3,
+       "recommendation": null
+      },
+      "_id": "gtHXxwXsTtlNe0fg",
+      "type": "AbilityScoreImprovement",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     }
+    }
+   }
+  },
+  {
+   "_id": "HzNRLyFxcI4Dqeaw",
+   "name": "Graveborn",
+   "type": "race",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "TCMP1",
+     "rules": ""
+    },
+    "identifier": "graveborn",
+    "advancement": {
+     "Puwep9QQbHrwa5AA": {
+      "configuration": {
+       "sizes": [
+        "med"
+       ]
+      },
+      "_id": "Puwep9QQbHrwa5AA",
+      "type": "Size",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     },
+     "wavs13gqy1RDKcAB": {
+      "configuration": {
+       "allowReplacements": false,
+       "choices": [],
+       "grants": [
+        "dr:cold"
+       ],
+       "mode": "default"
+      },
+      "_id": "wavs13gqy1RDKcAB",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Frozen Waste",
+      "value": {}
+     },
+     "4oI1ITnBiBBtQgxT": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 2,
+         "pool": [
+          "languages:standard:*"
+         ]
+        }
+       ],
+       "grants": [
+        "languages:languages:standard:common"
+       ],
+       "mode": "default"
+      },
+      "_id": "4oI1ITnBiBBtQgxT",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Languages",
+      "value": {}
+     }
+    }
+   }
+  },
+  {
+   "_id": "bZJkPfbPIvOUwPsM",
+   "name": "Dwarf",
+   "type": "race",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB 2024",
+     "rules": ""
+    },
+    "identifier": "dwarf",
+    "advancement": {
+     "ulnRq4eqzo6EG3p9": {
+      "configuration": {
+       "sizes": [
+        "med"
+       ]
+      },
+      "_id": "ulnRq4eqzo6EG3p9",
+      "type": "Size",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     },
+     "rntzM9xPVxE92Mjr": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 2,
+         "pool": [
+          "languages:standard:*"
+         ]
+        }
+       ],
+       "grants": [
+        "languages:languages:standard:common"
+       ],
+       "mode": "default"
+      },
+      "_id": "rntzM9xPVxE92Mjr",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Languages",
+      "value": {}
+     },
+     "gMpJiht7fOMIIbcU": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-species.Item.qwKbi3ppWBqSwCCJ",
+         "optional": false
+        },
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-species.Item.NgvIxO05kZV5MHQy",
+         "optional": false
+        },
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-species.Item.ODpj7ykkAR1MWPX9",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": null
+      },
+      "_id": "gMpJiht7fOMIIbcU",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Traits",
+      "value": {}
+     }
+    },
+    "movement": {
+     "burrow": "0",
+     "climb": "0",
+     "fly": "0",
+     "swim": "0",
+     "walk": "30",
+     "units": "ft",
+     "hover": false,
+     "ignoredDifficultTerrain": []
+    },
+    "senses": {
+     "ranges": {
+      "blindsight": null,
+      "darkvision": null,
+      "tremorsense": null,
+      "truesight": null
+     },
+     "units": "ft",
+     "special": ""
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<p>Sample text. Dwarves in this sample are short, sturdy and patient.</p>\n<p style=\"font-family:Roboto Condensed\"><strong>Dwarf Traits</strong><br>&amp;Reference[darkvision]{Darkvision}, Sturdy, Stone Sense</p>\n\n<p><b>&amp;Reference[darkvision]{Darkvision}</b></p>\n<p>You have &amp;Reference[darkvision]{Darkvision} with a range of 120 feet.</p>\n\n<p><b>Size</b></p>\n<p>You are Medium.</p>\n\n<p><b>Speed</b></p>\n<p>Your speed is 30 ft.</p>\n\n<p><b>Sturdy</b></p>\n<p>Sample text. Your Hit Point maximum increases by 1 per level.</p>\n\n<p><b>Stone Sense</b></p>\n<p>As a Bonus Action, you gain &amp;Reference[tremorsense]{Tremorsense} with a range of 60 feet for 10 minutes. You must be touching stone to use it.</p>\n\n<p><b>Languages</b></p>\n<p>Sample text. You know Common and two other standard languages.</p>\n</div>"
+    }
+   }
+  },
+  {
+   "_id": "IByoOYEQlWWpF642",
+   "name": "Wood Elf",
+   "type": "race",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB 2024",
+     "rules": ""
+    },
+    "identifier": "wood-elf",
+    "advancement": {
+     "hMqtnuUEY6IaR8Uj": {
+      "configuration": {
+       "sizes": [
+        "med"
+       ]
+      },
+      "_id": "hMqtnuUEY6IaR8Uj",
+      "type": "Size",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     },
+     "jvoZhGOTnQQLPSWo": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-spells.Item.mQWd9ELdEWPlqlZT",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": {
+        "ability": [
+         "int",
+         "wis",
+         "cha"
+        ],
+        "method": "spell",
+        "prepared": 2,
+        "uses": {
+         "max": "",
+         "per": "",
+         "requireSlot": false
+        }
+       }
+      },
+      "_id": "jvoZhGOTnQQLPSWo",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 1,
+      "hint": "Intelligence, Wisdom, or Charisma is the spellcasting ability for these spells.",
+      "title": "Elven Lineage (Spells)",
+      "value": {}
+     },
+     "oJhsCzGd8hV43z9a": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-spells.Item.TdBEOq1CDAxue830",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": {
+        "ability": [
+         "int",
+         "wis",
+         "cha"
+        ],
+        "method": "innate",
+        "prepared": 2,
+        "uses": {
+         "max": "",
+         "per": "",
+         "requireSlot": false
+        }
+       }
+      },
+      "_id": "oJhsCzGd8hV43z9a",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 3,
+      "hint": "Intelligence, Wisdom, or Charisma is the spellcasting ability for these spells.",
+      "title": "Elven Lineage (Spells)",
+      "value": {}
+     },
+     "du2AQlSX7pdu0UyU": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-spells.Item.FXSuYaoXviZuCbiL",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": {
+        "ability": [
+         "int",
+         "wis",
+         "cha"
+        ],
+        "method": "innate",
+        "prepared": 2,
+        "uses": {
+         "max": "",
+         "per": "",
+         "requireSlot": false
+        }
+       }
+      },
+      "_id": "du2AQlSX7pdu0UyU",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 5,
+      "hint": "Intelligence, Wisdom, or Charisma is the spellcasting ability for these spells.",
+      "title": "Elven Lineage (Spells)",
+      "value": {}
+     },
+     "hTZxN9EXh2vAke6c": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 2,
+         "pool": [
+          "languages:standard:*"
+         ]
+        }
+       ],
+       "grants": [
+        "languages:languages:standard:common"
+       ],
+       "mode": "default"
+      },
+      "_id": "hTZxN9EXh2vAke6c",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Languages",
+      "value": {}
+     }
+    },
+    "movement": {
+     "burrow": "0",
+     "climb": "0",
+     "fly": "0",
+     "swim": "0",
+     "walk": "30",
+     "units": "ft",
+     "hover": false,
+     "ignoredDifficultTerrain": []
+    },
+    "senses": {
+     "ranges": {
+      "blindsight": null,
+      "darkvision": null,
+      "tremorsense": null,
+      "truesight": null
+     },
+     "units": "ft",
+     "special": ""
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<p>Sample text. Elves in this sample keep long memories and short tempers.</p>\n<p style=\"font-family:Roboto Condensed\"><strong>Elf Traits</strong><br>&amp;Reference[darkvision]{Darkvision}, Elven Lineage, Light Sleeper</p>\n\n<p><b>Size</b></p>\n<p>You are Medium.</p>\n\n<p><b>Speed</b></p>\n<p>Your speed is 30 feet.</p>\n\n<p><b>&amp;Reference[darkvision]{Darkvision}</b></p>\n<p>You have &amp;Reference[darkvision]{Darkvision} with a range of 60 feet.</p>\n\n<p><b>Elven Lineage</b></p>\n<p>Sample text. Choose a lineage from the table. You gain its level 1 benefit, and a spell at levels 3 and 5.</p>\n<table class=\"table-compendium table--left-all\"><caption>Elven Lineages</caption>\n<thead>\n<tr>\n<th>Lineage</th>\n<th>Level 1</th>\n<th>Level 3</th>\n<th>Level 5</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Drow</td>\n<td>The range of your &amp;Reference[darkvision]{Darkvision} increases to 120 feet. You also know the Dancing Lights cantrip.</td>\n<td>Faerie Fire</td>\n<td>Darkness</td>\n</tr>\n<tr>\n<td>High Elf</td>\n<td>You know one Wizard cantrip of your choice.</td>\n<td>Detect Magic</td>\n<td>Misty Step</td>\n</tr>\n<tr>\n<td>Wood Elf</td>\n<td>Your Speed increases to 35 feet. You also know the Druidcraft cantrip.</td>\n<td>Longstrider</td>\n<td>Pass without Trace</td>\n</tr>\n</tbody>\n</table>\n\n<p><b>Light Sleeper</b></p>\n<p>Sample text. You finish a Long Rest in 4 hours.</p>\n\n<p><b>Languages</b></p>\n<p>Sample text. You know Common and two other standard languages.</p>\n</div>"
+    }
+   }
+  },
+  {
+   "_id": "0m8SZu2gWBLEo9jx",
+   "name": "Elf (Drow)",
+   "type": "race",
+   "flags": {
+    "ddbimporter": {
+     "is2014": false,
+     "is2024": true,
+     "legacy": false
+    }
+   },
+   "system": {
+    "source": {
+     "book": "PHB 2024",
+     "rules": ""
+    },
+    "identifier": "elf-drow",
+    "advancement": {
+     "r2D1DxqzJpNHMXvf": {
+      "configuration": {
+       "sizes": [
+        "med"
+       ]
+      },
+      "_id": "r2D1DxqzJpNHMXvf",
+      "type": "Size",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "value": {}
+     },
+     "vNyp83MyWxi2s3n1": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-spells.Item.qvUzykK8XLMYADHy",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": {
+        "ability": [
+         "int",
+         "wis",
+         "cha"
+        ],
+        "method": "spell",
+        "prepared": 2,
+        "uses": {
+         "max": "",
+         "per": "",
+         "requireSlot": false
+        }
+       }
+      },
+      "_id": "vNyp83MyWxi2s3n1",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 1,
+      "hint": "Intelligence, Wisdom, or Charisma is the spellcasting ability for these spells.",
+      "title": "Elven Lineage (Spells)",
+      "value": {}
+     },
+     "fDfDLfsKtsUXp3l1": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-spells.Item.TSqkubDMvqFCGLYT",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": {
+        "ability": [
+         "int",
+         "wis",
+         "cha"
+        ],
+        "method": "innate",
+        "prepared": 2,
+        "uses": {
+         "max": "",
+         "per": "",
+         "requireSlot": false
+        }
+       }
+      },
+      "_id": "fDfDLfsKtsUXp3l1",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 3,
+      "hint": "Intelligence, Wisdom, or Charisma is the spellcasting ability for these spells.",
+      "title": "Elven Lineage (Spells)",
+      "value": {}
+     },
+     "VsRVb9CVagHBK9YV": {
+      "configuration": {
+       "items": [
+        {
+         "uuid": "Compendium.world.ddb-campaign-ddb-spells.Item.xbFJTypJYpvUgN42",
+         "optional": false
+        }
+       ],
+       "optional": false,
+       "spell": {
+        "ability": [
+         "int",
+         "wis",
+         "cha"
+        ],
+        "method": "innate",
+        "prepared": 2,
+        "uses": {
+         "max": "",
+         "per": "",
+         "requireSlot": false
+        }
+       }
+      },
+      "_id": "VsRVb9CVagHBK9YV",
+      "type": "ItemGrant",
+      "flags": {},
+      "level": 5,
+      "hint": "Intelligence, Wisdom, or Charisma is the spellcasting ability for these spells.",
+      "title": "Elven Lineage (Spells)",
+      "value": {}
+     },
+     "v8W8ox14IeMw9Q3e": {
+      "configuration": {
+       "allowReplacements": true,
+       "choices": [
+        {
+         "count": 2,
+         "pool": [
+          "languages:standard:*"
+         ]
+        }
+       ],
+       "grants": [
+        "languages:languages:standard:common"
+       ],
+       "mode": "default"
+      },
+      "_id": "v8W8ox14IeMw9Q3e",
+      "type": "Trait",
+      "flags": {},
+      "level": 0,
+      "hint": "",
+      "title": "Languages",
+      "value": {}
+     }
+    },
+    "movement": {
+     "burrow": "0",
+     "climb": "0",
+     "fly": "0",
+     "swim": "0",
+     "walk": "30",
+     "units": "ft",
+     "hover": false,
+     "ignoredDifficultTerrain": []
+    },
+    "senses": {
+     "ranges": {
+      "blindsight": null,
+      "darkvision": null,
+      "tremorsense": null,
+      "truesight": null
+     },
+     "units": "ft",
+     "special": ""
+    },
+    "description": {
+     "value": "<div class=\"ddb\">\n<p>Sample text. Elves in this sample keep long memories and short tempers.</p>\n<p style=\"font-family:Roboto Condensed\"><strong>Elf Traits</strong><br>&amp;Reference[darkvision]{Darkvision}, Elven Lineage, Light Sleeper</p>\n\n<p><b>Size</b></p>\n<p>You are Medium.</p>\n\n<p><b>Speed</b></p>\n<p>Your speed is 30 feet.</p>\n\n<p><b>&amp;Reference[darkvision]{Darkvision}</b></p>\n<p>You have &amp;Reference[darkvision]{Darkvision} with a range of 60 feet.</p>\n\n<p><b>Elven Lineage</b></p>\n<p>Sample text. Choose a lineage from the table. You gain its level 1 benefit, and a spell at levels 3 and 5.</p>\n<table class=\"table-compendium table--left-all\"><caption>Elven Lineages</caption>\n<thead>\n<tr>\n<th>Lineage</th>\n<th>Level 1</th>\n<th>Level 3</th>\n<th>Level 5</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Drow</td>\n<td>The range of your &amp;Reference[darkvision]{Darkvision} increases to 120 feet. You also know the Dancing Lights cantrip.</td>\n<td>Faerie Fire</td>\n<td>Darkness</td>\n</tr>\n<tr>\n<td>High Elf</td>\n<td>You know one Wizard cantrip of your choice.</td>\n<td>Detect Magic</td>\n<td>Misty Step</td>\n</tr>\n<tr>\n<td>Wood Elf</td>\n<td>Your Speed increases to 35 feet. You also know the Druidcraft cantrip.</td>\n<td>Longstrider</td>\n<td>Pass without Trace</td>\n</tr>\n</tbody>\n</table>\n\n<p><b>Light Sleeper</b></p>\n<p>Sample text. You finish a Long Rest in 4 hours.</p>\n\n<p><b>Languages</b></p>\n<p>Sample text. You know Common and two other standard languages.</p>\n</div>"
+    }
+   }
+  }
+ ],
+ "classWealth": [
+  {
+   "name": "Bard",
+   "book": "PHB 2024",
+   "wealth": "5d4 * 10",
+   "entries": 6
+  },
+  {
+   "name": "Cleric",
+   "book": "PHB 2024",
+   "wealth": "5d4 * 10",
+   "entries": 7
+  },
+  {
+   "name": "Barbarian",
+   "book": "PHB 2024",
+   "wealth": "2d4 * 10",
+   "entries": 5
+  },
+  {
+   "name": "Ranger",
+   "book": "PHB 2024",
+   "wealth": "5d4 * 10",
+   "entries": 10
+  },
+  {
+   "name": "Druid",
+   "book": "PHB 2024",
+   "wealth": "2d4 * 10",
+   "entries": 9
+  },
+  {
+   "name": "Monk",
+   "book": "PHB 2024",
+   "wealth": "5d4",
+   "entries": 8
+  },
+  {
+   "name": "Fighter",
+   "book": "PHB 2024",
+   "wealth": "5d4 * 10",
+   "entries": 17
+  },
+  {
+   "name": "Rogue",
+   "book": "PHB 2024",
+   "wealth": "4d4 * 10",
+   "entries": 10
+  },
+  {
+   "name": "Paladin",
+   "book": "PHB 2024",
+   "wealth": "5d4 * 10",
+   "entries": 8
+  },
+  {
+   "name": "Sorcerer",
+   "book": "PHB 2024",
+   "wealth": "3d4 * 10",
+   "entries": 7
+  },
+  {
+   "name": "Wizard",
+   "book": "PHB 2024",
+   "wealth": "4d4 * 10",
+   "entries": 7
+  },
+  {
+   "name": "Warlock",
+   "book": "PHB 2024",
+   "wealth": "4d4 * 10",
+   "entries": 8
+  },
+  {
+   "name": "Artificer (STUB)",
+   "book": "STUB",
+   "wealth": null,
+   "entries": 0
+  },
+  {
+   "name": "Gunslinger",
+   "book": "Shattered Coast (Homebrew, Gunslinger v1)",
+   "wealth": "175",
+   "entries": 8
+  },
+  {
+   "name": "Tidecaller",
+   "book": "Shattered Coast: Player's Guide (Homebrew)",
+   "wealth": "5d4 * 10",
+   "entries": 16
+  },
+  {
+   "name": "Pugilist",
+   "book": "The Pugilist Class (Sterling Vermin / DDB 2024)",
+   "wealth": "5d4",
+   "entries": 7
+  },
+  {
+   "name": "Artificer",
+   "book": "Eberron: Forge of the Artificer (Imported Stock)",
+   "wealth": "",
+   "entries": 0
+  }
+ ],
+ "speciesIndex": [
+  {
+   "name": "Graveborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Graveborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Shadar-kai",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Shadar-kai",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Half-Elf (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Half-Elf",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Dragonborn (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dragonborn",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Water Genasi (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Genasi",
+     "subRaceShortName": "Water",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Tabaxi",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Tabaxi",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Fire Genasi (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Genasi",
+     "subRaceShortName": "Fire",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Goblin",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Goblin",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Fairy",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Fairy",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Hobgoblin",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Hobgoblin",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Kenku",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Kenku",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Goliath",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Goliath",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Human",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Human",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Aarakocra",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Aarakocra",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Triton",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Triton",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Yuan-ti",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Yuan-ti",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Wood Elf (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": "Wood",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Hill Dwarf (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dwarf",
+     "subRaceShortName": "Hill",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Lightfoot Halfling (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Halfling",
+     "subRaceShortName": "Lightfoot",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Sea Elf",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Sea Elf",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Eladrin",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Eladrin",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Air Genasi (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Genasi",
+     "subRaceShortName": "Air",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Shifter (MotM)",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Shifter",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Half-Orc (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Half-Orc",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Aasimar (MotM)",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Aasimar",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Bugbear",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Bugbear",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Custom Lineage",
+   "book": "TCoE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Custom Lineage",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Tiefling (Infernal)",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Tiefling",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Bogborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Bogborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Changeling (MotM)",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Changeling",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Deep Gnome (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Gnome",
+     "subRaceShortName": "Deep",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Orc (MotM)",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Orc",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Threadborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Threadborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Tiefling (Abyssal)",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Tiefling",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Human (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Human",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Ashborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Ashborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Gnarlborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Gnarlborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Tortle",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Tortle",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Kobold",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Kobold",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Halfling",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Halfling",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Githzerai",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Githzerai",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Azureborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Azureborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Orc",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Orc",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Duergar",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Duergar",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Earth Genasi",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Earth Genasi",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Curseborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Curseborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Drow (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": "Drow",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Stoneborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Stoneborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Gem Dragonborn",
+   "book": "FToD",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dragonborn",
+     "subRaceShortName": "Gem",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Forest Gnome (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Gnome",
+     "subRaceShortName": "Forest",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "High Elf",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Chromatic Dragonborn",
+   "book": "FToD",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dragonborn",
+     "subRaceShortName": "Chromatic",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Harvestborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Harvestborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Satyr",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Satyr",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Harengon",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Harengon",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Goliath (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Goliath",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Forest Gnome",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Gnome",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Air Genasi",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Air Genasi",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Fire Genasi",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Fire Genasi",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Metallic Dragonborn",
+   "book": "FToD",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dragonborn",
+     "subRaceShortName": "Metallic",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Tiefling (Cthonic)",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Tiefling",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Silkborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Silkborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Minotaur",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Minotaur",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Eladrin (Variant)",
+   "book": "DMG",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": "Eladrin",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Lizardfolk",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Lizardfolk",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Rock Gnome",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Gnome",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Etherean",
+   "book": "GSB2",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Etherean",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Stout Halfling (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Halfling",
+     "subRaceShortName": "Stout",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Dragonborn",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dragonborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Mountain Dwarf (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dwarf",
+     "subRaceShortName": "Mountain",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Wood Elf",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Aasimar",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Aasimar",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Variant Human (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Human",
+     "subRaceShortName": "Variant",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Deepborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Deepborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Deep Gnome",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Deep Gnome",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Variant Aasimar",
+   "book": "DMG",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Aasimar",
+     "subRaceShortName": "Variant",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Tiefling (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Tiefling",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Githyanki",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Githyanki",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Firbolg",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Firbolg",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Goliath (MotM)",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Goliath",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Plagueborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Plagueborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Feathren",
+   "book": "GSB1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Feathren",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Aarakocra (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Aarakocra",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Rock Gnome (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Gnome",
+     "subRaceShortName": "Rock",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Centaur",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Centaur",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Dwarf",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Dwarf",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Water Genasi",
+   "book": "MotM",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Water Genasi",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Elf (Drow)",
+   "book": "PHB 2024",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "High Elf (PHB)",
+   "book": "PHB",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Elf",
+     "subRaceShortName": "High",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Geleton",
+   "book": "GSB2",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Geleton",
+     "subRaceShortName": null,
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Earth Genasi (EE)",
+   "book": "EE",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Genasi",
+     "subRaceShortName": "Earth",
+     "is2024": false,
+     "is2014": true
+    }
+   }
+  },
+  {
+   "name": "Relicborn",
+   "book": "TCMP1",
+   "flags": {
+    "ddbimporter": {
+     "baseRaceName": "Relicborn",
+     "subRaceShortName": null,
+     "is2024": true,
+     "is2014": false
+    }
+   }
+  },
+  {
+   "name": "Dhampir",
+   "book": "Ravenloft: The Horrors Within",
+   "flags": {}
+  },
+  {
+   "name": "Reborn",
+   "book": "Ravenloft: The Horrors Within",
+   "flags": {}
+  },
+  {
+   "name": "Hexblood",
+   "book": "Ravenloft: The Horrors Within",
+   "flags": {}
+  },
+  {
+   "name": "Lupin",
+   "book": "Ravenloft: The Horrors Within",
+   "flags": {}
+  }
+ ],
+ "srdSpecies2024": [
+  "Dragonborn",
+  "Dwarf",
+  "Elf, Drow",
+  "Elf, High",
+  "Elf, Wood",
+  "Gnome, Forest",
+  "Gnome, Rock",
+  "Goliath",
+  "Halfling",
+  "Human",
+  "Orc",
+  "Tiefling, Abyssal",
+  "Tiefling, Chthonic",
+  "Tiefling, Infernal"
+ ]
+}

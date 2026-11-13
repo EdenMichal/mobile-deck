@@ -1,0 +1,70 @@
+{
+  "id": "mobile-deck",
+  "title": "Mobile Deck",
+  "description": "A phone and tablet interface for Foundry VTT, with D&D5e support, Pathfinder Second Edition community test support on Foundry v14+, native gameplay actions, chat, journals, and touch Scene controls. Adds a Character Builder (level up, character creation and spells), player item creation, and a party inventory. A fork of VE Mobile by Silvestrae.",
+  "version": "1.0.0",
+  "url": "https://github.com/EdenMichal/mobile-deck",
+  "manifest": "https://github.com/EdenMichal/mobile-deck/releases/latest/download/module.json",
+  "download": "https://github.com/EdenMichal/mobile-deck/releases/download/v1.0.0/mobile-deck-v1.0.0.zip",
+  "bugs": "https://github.com/EdenMichal/mobile-deck/issues",
+  "license": "https://github.com/EdenMichal/mobile-deck/blob/main/LICENSE",
+  "socket": true,
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14.369"
+  },
+  "authors": [
+    {
+      "name": "EdenMichal"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "5.3.2",
+          "verified": "6.0.6"
+        }
+      },
+      {
+        "id": "pf2e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "8.6.1",
+          "verified": "8.6.1"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "src/entry.mjs"
+  ],
+  "styles": [
+    "assets/ve-mobile.css",
+    "assets/ve-style-authority.css",
+    "assets/pf2e.css",
+    "assets/ve-builder.css",
+    "assets/ve-item-create.css",
+    "assets/ve-party.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English (United States)",
+      "path": "locales/en.json"
+    },
+    {
+      "lang": "en-AU",
+      "name": "English (Australia)",
+      "path": "locales/en-AU.json"
+    },
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "locales/ru.json"
+    }
+  ],
+  "flags": {}
+}

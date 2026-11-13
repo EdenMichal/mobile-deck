@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check module.json against the tag
+        id: version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(jq -r .version module.json)"
+          if [ "$version" != "$tag" ]; then
+            echo "::error file=module.json::version is \"$version\" but the tag is $GITHUB_REF_NAME (expected \"$tag\")"
+            exit 1
+          fi
+          download="$(jq -r .download module.json)"
+          case "$download" in
+            */releases/download/v$version/mobile-deck-v$version.zip) ;;
+            *) echo "::error file=module.json::download is \"$download\"; it must end with /releases/download/v$version/mobile-deck-v$version.zip"; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the module zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Runtime files only: no tests/, tools/, docs/ or .github/.
+          files=(module.json LICENSE README.md CHANGELOG.md src assets locales)
+          [ -f entry.mjs ] && files+=(entry.mjs)
+          # Everything module.json loads must exist and be inside the zip.
+          missing=0
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            if [ ! -e "$path" ]; then echo "::error file=module.json::$path is listed but missing"; missing=1; continue; fi
+            inside=0
+            for f in "${files[@]}"; do case "$path" in "$f"|"$f"/*) inside=1 ;; esac; done
+            if [ "$inside" = 0 ]; then echo "::error file=module.json::$path is listed but not packed"; missing=1; fi
+          done < <(jq -r '(.esmodules // [])[], (.scripts // [])[], (.styles // [])[], (.languages // [])[].path, (.packs // [])[].path' module.json)
+          [ "$missing" = 0 ]
+          zip -r -X -q "mobile-deck-v$VERSION.zip" "${files[@]}" -x '*.DS_Store'
+          unzip -l "mobile-deck-v$VERSION.zip"
+
+      - name: Publish the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mobile Deck ${{ steps.version.outputs.version }}
+          files: |
+            mobile-deck-v${{ steps.version.outputs.version }}.zip
+            module.json
+          fail_on_unmatched_files: true

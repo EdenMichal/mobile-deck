@@ -1,0 +1,391 @@
+/* Party inventory (dnd5e Group actor as the party stash).
+ * Builds on the sheet card, currency strip and currency-editor sheet in
+ * ve-mobile.css; only party-specific pieces live here. */
+
+/* Accent colours that stay readable on every built-in accent, light and dark (WCAG AA, measured):
+ * --ve-party-accent-text: accent text on the sheet's surfaces, mixed 40/60 toward the text colour
+ *   (worst case 4.96:1, paladin gold on the light theme);
+ * --ve-party-on-accent: the label on a solid accent fill. Near-black suits the class accents and the
+ *   neutral scheme (worst case 4.74:1, warlock); white suits the red scheme (5.27:1) and the dark
+ *   bestiary red on the light theme (9.67:1); the custom scheme brings its own text colour. */
+/* Declared where the accent itself is declared, so the mix resolves against it. */
+:is(.ve-mobile-app, .ve-character-screen) {
+  --ve-party-accent-text: color-mix(in srgb, var(--ve-character-accent) 40%, var(--ve-text));
+}
+
+/* The app root always carries data-theme and data-character-theme; sheets inherit from it. */
+.ve-mobile-app {
+  --ve-party-on-accent: #151313;
+}
+
+.ve-mobile-app:is([data-character-theme="red"], :not([data-character-theme])),
+.ve-mobile-app[data-theme="light"][data-character-theme="bestiary"] {
+  --ve-party-on-accent: #fff;
+}
+
+.ve-mobile-app[data-character-theme="custom"] {
+  --ve-party-on-accent: var(--ve-custom-accent-text, #151313);
+}
+
+.ve-mobile-app .ve-party-sheet button.ve-currency-editor-submit {
+  color: var(--ve-party-on-accent);
+}
+
+.ve-party-sheet > header small {
+  color: var(--ve-party-accent-text);
+}
+
+/* Entry row inside the Inventory card. */
+.ve-mobile-app button.ve-party-entry {
+  width: 100%;
+  min-height: 54px;
+  margin: 0;
+  padding: 7px 12px 7px 10px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--ve-border);
+  border-radius: 0;
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-character-accent) 8%, var(--ve-surface));
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ve-mobile-app button.ve-party-entry:active,
+.ve-mobile-app button.ve-party-entry:focus-visible {
+  background: color-mix(in srgb, var(--ve-character-accent) 16%, var(--ve-surface));
+}
+
+.ve-mobile-app button.ve-party-entry > i {
+  color: var(--ve-subtle);
+  font-size: 0.72rem;
+}
+
+.ve-party-entry-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 60%, var(--ve-border));
+  border-radius: 12px 5px 12px 5px;
+  color: var(--ve-party-accent-text);
+  background: var(--ve-surface-up);
+  font-size: 0.95rem;
+}
+
+.ve-party-entry-copy,
+.ve-party-row-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.ve-party-entry-copy strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+}
+
+.ve-party-entry-copy small,
+.ve-party-row-copy small {
+  overflow: hidden;
+  color: var(--ve-subtle);
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Read-only and empty states. */
+.ve-party-notice {
+  margin: 0;
+  padding: 10px 13px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  border-bottom: 1px solid var(--ve-border);
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font-size: 0.72rem;
+  line-height: 1.42;
+}
+
+.ve-party-notice > i {
+  margin-top: 2px;
+  color: var(--ve-party-accent-text);
+}
+
+.ve-party-empty {
+  min-height: 190px;
+  padding: 26px 24px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--ve-subtle);
+  text-align: center;
+}
+
+.ve-party-empty > i {
+  color: var(--ve-party-accent-text);
+  font-size: 1.6rem;
+}
+
+.ve-party-empty > strong {
+  color: var(--ve-text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.98rem;
+}
+
+.ve-party-empty > p {
+  max-width: 300px;
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* Party coins: the sheet's coin chips, without the edit button column. */
+.ve-currency-strip.ve-party-coins {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 0;
+}
+
+.ve-party-coin-actions {
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border-bottom: 1px solid var(--ve-border);
+}
+
+.ve-mobile-app .ve-party-coin-actions button {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 45%, var(--ve-border));
+  border-radius: 10px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.ve-mobile-app .ve-party-coin-actions button > i {
+  color: var(--ve-party-accent-text);
+}
+
+/* Item rows. */
+.ve-party-row {
+  --ve-party-depth: 0;
+  min-height: 56px;
+  padding: 6px 10px 6px calc(10px + var(--ve-party-depth) * 18px);
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--ve-border) 76%, transparent);
+  background: var(--ve-surface);
+}
+
+.ve-party-list > .ve-party-row:first-child {
+  border-top: 0;
+}
+
+.ve-party-row[data-depth]:not([data-depth="0"]) {
+  background: color-mix(in srgb, var(--ve-surface-up) 45%, var(--ve-surface));
+}
+
+.ve-party-row-copy strong {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--ve-text);
+  font-size: 0.8rem;
+}
+
+.ve-party-row-copy strong > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ve-party-row-copy strong > b {
+  flex: 0 0 auto;
+  color: var(--ve-party-accent-text);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ve-mobile-app button.ve-party-move {
+  min-width: 66px;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 70%, var(--ve-border));
+  border-radius: 999px;
+  color: var(--ve-party-accent-text);
+  background: color-mix(in srgb, var(--ve-character-accent) 10%, var(--ve-surface));
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+}
+
+.ve-mobile-app button.ve-party-move:active:not(:disabled) {
+  color: var(--ve-party-on-accent);
+  background: var(--ve-character-accent);
+}
+
+.ve-mobile-app button.ve-party-move:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.ve-mobile-app :is(button.ve-party-move, .ve-party-coin-actions button, button.ve-party-entry, .ve-party-sheet button):focus-visible {
+  outline: 2px solid var(--ve-character-accent);
+  outline-offset: 2px;
+}
+
+/* "Send from <character>" collapsible list sits flush in its card. */
+.ve-party-card > .ve-party-mine {
+  border-top: 0;
+}
+
+/* Quantity and coin sheets reuse the currency editor; these are the extras. */
+.ve-party-sheet-hint {
+  margin: 2px 2px 10px;
+  color: var(--ve-subtle);
+  font-size: 0.72rem;
+}
+
+.ve-party-stepper {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+  gap: 8px;
+}
+
+.ve-mobile-app .ve-party-stepper button {
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
+  min-height: 52px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ve-border);
+  border-radius: 12px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font-size: 1rem;
+}
+
+.ve-party-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--ve-character-accent) 48%, var(--ve-border));
+  border-radius: 12px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.ve-party-presets {
+  margin: 10px 0 14px;
+  display: flex;
+  gap: 8px;
+}
+
+.ve-mobile-app .ve-party-presets button {
+  flex: 1 1 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--ve-border);
+  border-radius: 999px;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.ve-party-sheet .ve-currency-editor-rows {
+  margin-bottom: 14px;
+}
+
+.ve-party-coin-row {
+  grid-template-columns: minmax(72px, 1fr) 44px minmax(64px, 96px) 44px;
+}
+
+/* The coin label is also the "move all of this coin" button: a full 44px target. */
+.ve-mobile-app .ve-party-coin-row button.ve-party-coin-max {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  height: auto;
+  margin: 0;
+  padding: 4px 8px;
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--ve-coin) 40%, var(--ve-border));
+  border-radius: 10px;
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-coin) 10%, var(--ve-surface));
+  text-align: left;
+}
+
+.ve-party-coin-max > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ve-coin);
+  font-size: 0.75rem;
+}
+
+.ve-party-coin-max > small {
+  color: var(--ve-subtle);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The steppers replace the browser's own number spinners. */
+.ve-party-sheet input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.ve-party-sheet input[type="number"]::-webkit-inner-spin-button,
+.ve-party-sheet input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.ve-mobile-app .ve-party-sheet :is(button, input):disabled {
+  opacity: 0.45;
+}
+
+.ve-party-stepper input:focus-visible,
+.ve-party-coin-row input:focus-visible {
+  outline: 2px solid var(--ve-character-accent);
+  outline-offset: 1px;
+}
+.ve-party-sheet:focus { outline: none; }

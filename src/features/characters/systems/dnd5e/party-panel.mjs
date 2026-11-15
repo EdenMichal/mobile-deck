@@ -160,6 +160,13 @@ function draftFor(actor, sheet, initial) {
   return draft;
 }
 function clearDraft(key) { if (draft?.key === key) draft = null; }
+// Close the sheet only if it is still this one. Moving a whole stack hides its sheet before the
+// GM answers, so the player may already have opened another sheet that must stay open.
+function closeOwnSheet(key, commands) {
+  if (draft && draft.key !== key) return;
+  draft = null;
+  commands.closePartySheet();
+}
 
 /** Render the open party sheet (quantity picker or coins) from app state, or null. Called by the
  * character presenter on every render, like the HP, rest and XP editors. */
@@ -292,8 +299,7 @@ function sheetLayer(actor, sheet, commands, scope, state, { kicker, title, iconN
         await run();
         globalThis.navigator?.vibrate?.(5);
         state.pending = false;
-        clearDraft(key);
-        commands.closePartySheet();
+        closeOwnSheet(key, commands);
       } catch (error) {
         state.pending = false;
         state.view?.setPending(false);

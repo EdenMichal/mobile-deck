@@ -141,7 +141,9 @@ try {
 
   // ---- A container moves with its contents
   await stashRow("Test Bag").locator(".ve-party-move").first().click();
-  await waitFor(page, ({ AYLA }) => game.actors.getName(AYLA).items.getName("Ruby"), { AYLA });
+  // A move copies to the target first and removes from the source second, so wait for both writes.
+  await waitFor(page, ({ PARTY, AYLA }) => game.actors.getName(AYLA).items.getName("Ruby")
+    && !game.actors.getName(PARTY).items.getName("Test Bag") && !game.actors.getName(PARTY).items.getName("Ruby"), { PARTY, AYLA });
   state = await readState(page);
   const bag = itemOf(state.ayla, "Test Bag"), ruby = itemOf(state.ayla, "Ruby");
   check("Take the Bag: the Ruby comes along inside it", bag && ruby && ruby.container === bag.id && !itemOf(state.party, "Ruby") && !itemOf(state.party, "Test Bag"), state);
@@ -150,7 +152,7 @@ try {
   const mine = page.locator("details.ve-party-mine");
   if (!(await mine.evaluate(el => el.open))) await mine.locator("summary").click();
   await mineRow("Longsword").locator(".ve-party-move").click();
-  await waitFor(page, ({ PARTY }) => game.actors.getName(PARTY).items.getName("Longsword"), { PARTY });
+  await waitFor(page, ({ PARTY, AYLA }) => game.actors.getName(PARTY).items.getName("Longsword") && !game.actors.getName(AYLA).items.getName("Longsword"), { PARTY, AYLA });
   state = await readState(page);
   check("Send Longsword: in the party, not equipped, gone from Ayla", itemOf(state.party, "Longsword")?.equipped === false && !itemOf(state.ayla, "Longsword"), state);
   await shot(page, "after-moves");
@@ -172,7 +174,8 @@ try {
   await sheet.waitFor();
   await sheet.locator(".ve-party-presets button").last().click(); // All 2
   await sheet.locator(".ve-currency-editor-submit").click();
-  await waitFor(page, ({ PARTY }) => game.actors.getName(PARTY).items.getName("Potion of Healing")?.system.quantity === 5, { PARTY });
+  await waitFor(page, ({ PARTY, AYLA }) => game.actors.getName(PARTY).items.getName("Potion of Healing")?.system.quantity === 5
+    && !game.actors.getName(AYLA).items.getName("Potion of Healing"), { PARTY, AYLA });
   state = await readState(page);
   check("Send 2 potions back: they join the party's stack (one row of 5)", state.party.items.filter(i => i.name === "Potion of Healing").length === 1
     && itemOf(state.party, "Potion of Healing").quantity === 5 && !itemOf(state.ayla, "Potion of Healing"), state);
@@ -192,7 +195,7 @@ try {
   await coins.waitFor();
   await coins.locator(".ve-party-coin-row.is-gp input").fill("3");
   await coins.locator(".ve-currency-editor-submit").click();
-  await waitFor(page, ({ PARTY }) => game.actors.getName(PARTY).system.currency.gp === 18, { PARTY });
+  await waitFor(page, ({ PARTY, AYLA }) => game.actors.getName(PARTY).system.currency.gp === 18 && game.actors.getName(AYLA).system.currency.gp === 12, { PARTY, AYLA });
   state = await readState(page);
   check("Deposit 3 gp: party 18, Ayla 12", state.party.currency.gp === 18 && state.ayla.currency.gp === 12, state);
   const overdraw = await page.evaluate(async ({ moduleId, AYLA, PARTY }) => {

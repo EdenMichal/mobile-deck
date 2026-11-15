@@ -3,18 +3,51 @@ import { icon, node } from "../../ui/dom.mjs";
 import { renderImageViewer } from "../../ui/image-viewer.mjs";
 import { buildJournalTree, journalBranchCount } from "./model.mjs";
 import { bindJournalFontSize } from "./font-size-controller.mjs";
+import { ensurePlayerJournalStyles } from "./player-journal-styles.mjs";
 
 // Render the journal library or the currently selected page from snapshot state.
 export function renderJournals({ state, commands, scope }) {
   if (state.journal) return journalReader(state, commands, scope);
-  const journals = state.snapshot?.journals ?? [];
   // Use the feature localizer with plain fallback text for library labels.
   const localize = (key, fallback, data) => commands.localize?.(key, fallback, data) ?? fallback;
+  const characters = readPlayerJournalCharacters(commands);
+  // A player's own notes show under My Journals, so the Library leaves those out. Notes whose
+  // character is gone (deleted, or no longer theirs) stay in the Library so they are never lost.
+  const mine = new Set(characters.map((character) => character.folderId).filter(Boolean));
+  const journals = (state.snapshot?.journals ?? []).filter((journal) => !journal.playerJournal || !journal.folderPath?.some((folder) => mine.has(folder.id)));
   const status = node("p", { className: `ve-journal-status${state.journalError ? " is-error" : ""}`, attrs: { role: "status", "aria-live": "polite" }, text: state.journalLoading ? localize("VEMOBILE.Journals.Opening", "Opening journal…") : localize(state.journalError, state.journalError) });
   return node("section", { className: "ve-list-screen ve-journal-library", attrs: { "aria-busy": String(Boolean(state.journalLoading)) }, children: [
     node("header", { children: [node("div", { children: [node("small", { text: localize("VEMOBILE.Journals.Library", "Library").toLocaleUpperCase() }), node("h2", { text: localize("VEMOBILE.Journals.Title", "Journals") })] }), node("span", { className: "ve-count", text: journals.length })] }),
     status,
+    characters.length ? myJournals(characters, commands, scope, localize) : null,
+    characters.length ? node("h3", { className: "ve-journal-library-heading", text: localize("VEMOBILE.Journals.Library", "Library") }) : null,
     journals.length ? node("div", { className: "ve-journal-tree", children: renderBranch(buildJournalTree(journals), commands, scope) }) : node("div", { className: "ve-empty", children: [icon("fa-book-open"), node("p", { text: localize("VEMOBILE.Journals.None", "No visible journals.") })] })
+  ].filter(Boolean) });
+}
+
+// The player's characters, or none for GMs and when player journals are unavailable.
+function readPlayerJournalCharacters(commands) {
+  try { return commands.playerJournalCharacters?.() ?? []; }
+  catch { return []; }
+}
+
+// One row per character: opens that character's private notes.
+function myJournals(characters, commands, scope, localize) {
+  ensurePlayerJournalStyles();
+  const status = node("p", { className: "ve-journal-status is-error", attrs: { role: "status", "aria-live": "polite", hidden: true } });
+  const open = (actorId) => {
+    status.hidden = true;
+    try { commands.openPlayerJournals(actorId); }
+    catch (error) { status.textContent = error?.message ?? String(error); status.hidden = false; }
+  };
+  return node("section", { className: "ve-journal-mine", attrs: { "aria-label": localize("VEMOBILE.PlayerJournals.Title", "My Journals") }, children: [
+    node("h3", { text: localize("VEMOBILE.PlayerJournals.Title", "My Journals") }),
+    status,
+    ...characters.map((character) => node("button", { className: "ve-journal-entry ve-journal-mine-entry", attrs: { type: "button", "data-actor-id": character.actorId }, on: { click: () => open(character.actorId) }, children: [
+      character.img ? node("img", { attrs: { src: character.img, alt: "" } }) : node("span", { className: "ve-journal-entry-icon", children: [icon("fa-feather")] }),
+      node("span", { children: [node("strong", { text: character.name }), node("small", { text: localize("VEMOBILE.PlayerJournals.CharacterNotes", "Your private notes") })] }),
+      icon("fa-chevron-right")
+    ] }, scope))
   ] });
 }
 

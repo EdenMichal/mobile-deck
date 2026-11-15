@@ -72,6 +72,8 @@ import { createPwaInstall } from "./ui/pwa-install.mjs";
 import { readPwaWorldName } from "./foundry/pwa-world-name.mjs";
 import { applyPlayerNoCanvasDefault } from "./foundry/player-canvas-default.mjs";
 import { isCommonDisplayUser } from "./foundry/common-display-user.mjs";
+import { createPlayerJournalGateway } from "./foundry/player-journal-gateway.mjs";
+import { createPlayerJournalsOpener } from "./features/journals/player-journals-layer.mjs";
 
 const isGamePage = /\/game\/?$/.test(window.location.pathname);
 
@@ -548,6 +550,14 @@ if (isGamePage) {
   const actionSessionGateway = systemIntegration.services.actionSession();
   const builderGateway = systemIntegration.services.builder?.() ?? null; // Character Builder (fork)
   systemIntegration.services.partyRelay?.(); // Party inventory moves run on the active GM's client
+  // Player journals: the GM's client answers players and keeps their folders, even on desktop.
+  const playerJournalGateway = createPlayerJournalGateway();
+  playerJournalGateway.register();
+  const playerJournalOpener = createPlayerJournalsOpener({ gateway: playerJournalGateway,
+    t: (key, fallback, data) => localizeFoundry(`VEMOBILE.PlayerJournals.${key}`, fallback, data),
+    readFontSize: () => session.readJournalFontSize?.() ?? 16 });
+  const playerJournals = Object.freeze({ available: () => playerJournalGateway.available(), characters: () => playerJournalGateway.characters(),
+    open: actorId => playerJournalOpener.open(actorId), close: () => playerJournalOpener.close() });
   const quickbarGateway = systemIntegration.services.quickbar({ isActive: () => kernel?.active === true && readPolicy().active });
   const customHeaderGateway = createCustomHeaderGateway({ isActive: () => kernel?.active === true && readPolicy().active });
   const hotbarGateway = systemIntegration.services.hotbar({ isActive: () => kernel?.active === true && readPolicy().active });
@@ -636,6 +646,7 @@ if (isGamePage) {
     commandGateway,
     actorEditorGateway,
     builderGateway,
+    playerJournals,
     biographyGateway,
     itemDetailsGateway,
     craftingGateway,

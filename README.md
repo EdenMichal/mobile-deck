@@ -16,6 +16,7 @@ Mobile Deck is a fork of [VE Mobile](https://github.com/Silvestrae/ve-mobile) by
 - **Character Builder (D&D5e).** Level up, create a new character and choose spells on your phone, with the GM's choice of compendiums, books and house rules. A GM can approve players' level-ups and new characters.
 - **Player items.** Create and delete items from the Inventory tab.
 - **Party inventory.** Send, take, deposit and withdraw items and coins through a D&D5e Group actor, with every move run on the GM's client.
+- **My Journals.** Players keep private notes per character: folders, journals, text and picture pages, written on the phone. Only the player and the GM can open them in Foundry.
 
 To install, paste this manifest URL into Foundry's **Add-on Modules > Install Module** ([details below](#install-and-start-playing)):
 
@@ -133,6 +134,7 @@ Turn on **Return to Scene after actions** if you want supported actions to bring
 
 - **Chat** keeps your system's roll cards and messages, with an unread badge that clears when you reach the newest message.
 - **Journals** show folders and pages. Pinch to change text size, or open an image to zoom in.
+- **My Journals** (players) sit above the Library, one row per character. Tap **New** for a folder or journal, **Add page** for a text or picture page, and **⋯** on any row to rename, move, reorder or delete it. Pages save as you type. New folders, journals and pictures need a GM online; writing doesn't. Privacy works like any Foundry journal: other players can't open these notes in Foundry or Mobile Deck, but Foundry sends every journal to every connected browser, so someone using the browser's developer tools could still read them.
 - **Combat** shows the turn order and the controls your role allows. The optional carousel keeps the order and **End Turn** on the map.
 
 ## Appearance and performance

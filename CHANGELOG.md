@@ -1,5 +1,9 @@
 # Changelog
 
+## Mobile Deck 1.1.0
+
+- **My Journals.** Players keep private notes for each of their characters on the Journals tab: make folders and journals, write text pages on a phone-sized writing screen that saves on its own, add pictures from the phone, and rename, move, reorder or delete any of it. Notes are ordinary Foundry journals in a **Player Journals** folder (one folder per player, one per character) that only the player and the GM can open in Foundry (as with any Foundry journal, the data still reaches every connected browser). Writing works with no GM online; new folders, new journals and pictures need a GM online, because Foundry lets only GMs make folders and, by default, only Trusted players make journals and Assistant GMs upload files.
+
 ## Mobile Deck 1.0.0
 
 First release as **Mobile Deck**, a fork of [VE Mobile](https://github.com/Silvestrae/ve-mobile) 1.2.0 by Silvestrae.

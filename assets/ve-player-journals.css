@@ -1,0 +1,229 @@
+/* My Journals: the player's private notes layer (features/journals/player-journals-layer.mjs).
+ * Built on the Character Builder shell, so it inherits ve-builder.css; these rules add the rows,
+ * action sheets, writing screen and picture pages. VE's colour tokens keep it on the player's theme. */
+
+/* ---- Rows: open button + ⋯ menu ---- */
+.ve-pj-list { overflow: hidden; }
+.ve-pj-list > .ve-pj-row:first-child .ve-pj-row-open { border-top: 0; }
+.ve-pj-row { display: flex; align-items: stretch; min-width: 0; }
+.ve-mobile-app .ve-pj-layer button.ve-pj-row-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  text-align: left;
+  font: inherit;
+}
+.ve-pj-row-open .ve-sheet-item-copy { min-width: 0; }
+.ve-pj-row-open .ve-sheet-item-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-pj-row-open > .fa-chevron-right { color: var(--ve-subtle); font-size: 0.8rem; justify-self: end; }
+.ve-pj-row.is-folder .ve-builder-row-art { color: var(--ve-gold); }
+.ve-mobile-app .ve-pj-layer button.ve-pj-row-menu {
+  flex: 0 0 48px;
+  width: 48px;
+  height: auto;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ve-border) 76%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--ve-border) 50%, transparent);
+  border-radius: 0;
+  color: var(--ve-subtle);
+  background: var(--ve-surface);
+}
+.ve-pj-list > .ve-pj-row:first-child .ve-pj-row-menu { border-top: 0; }
+.ve-pj-row-menu:active, .ve-pj-row-open:active { background: var(--ve-surface-up); }
+
+.ve-pj-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 4px 0;
+  color: var(--ve-subtle);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.ve-pj-note > i { margin-top: 2px; color: var(--ve-gold); }
+
+/* ---- Action sheets: menus, prompts, confirmations ---- */
+.ve-pj-sheet {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+  background: rgb(8 7 7 / 0.55);
+  animation: ve-pj-fade 140ms ease-out;
+}
+.ve-pj-sheet-panel {
+  width: min(100%, 560px);
+  max-height: 80%;
+  overflow: auto;
+  padding: 6px 14px 16px;
+  border: 1px solid var(--ve-border);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+  box-shadow: 0 -12px 36px rgb(0 0 0 / 0.35);
+  animation: ve-pj-rise 180ms ease-out;
+}
+.ve-pj-sheet-panel > header { display: flex; align-items: center; gap: 10px; min-height: 48px; }
+.ve-pj-sheet-panel > header strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+.ve-mobile-app .ve-pj-layer button.ve-pj-sheet-close {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ve-border);
+  border-radius: 9px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+}
+.ve-pj-menu { display: grid; gap: 6px; }
+.ve-mobile-app .ve-pj-layer button.ve-pj-menu-item {
+  width: 100%;
+  min-height: 50px;
+  height: auto;
+  margin: 0;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--ve-border) 72%, transparent);
+  border-radius: 11px 5px 11px 5px;
+  color: var(--ve-text);
+  background: var(--ve-surface-up);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+.ve-pj-menu-item > i { width: 20px; text-align: center; color: var(--ve-character-accent); }
+.ve-pj-menu-item > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-mobile-app .ve-pj-layer button.ve-pj-menu-item.is-danger, .ve-pj-menu-item.is-danger > i { color: var(--ve-red-bright, #e06b6b); }
+.ve-pj-prompt { display: grid; gap: 12px; }
+.ve-pj-prompt > p { margin: 0; line-height: 1.4; }
+.ve-mobile-app .ve-pj-layer input.ve-pj-input {
+  width: 100%;
+  min-height: 48px;
+  height: auto;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--ve-border) 72%, transparent);
+  border-radius: 11px 5px 11px 5px;
+  color: var(--ve-text);
+  background: color-mix(in srgb, var(--ve-surface-up) 70%, var(--ve-bg));
+  font-size: 16px; /* 16px keeps iOS from zooming in */
+}
+.ve-pj-input:focus-visible { outline: 2px solid var(--ve-character-accent); outline-offset: -1px; }
+.ve-pj-sheet-actions { display: flex; gap: 8px; }
+.ve-pj-sheet-actions > button { flex: 1; }
+.ve-mobile-app .ve-pj-layer .ve-builder button.ve-builder-primary.is-danger {
+  border-color: color-mix(in srgb, var(--ve-red, #b23a3a) 60%, var(--ve-border));
+  background: var(--ve-red, #b23a3a);
+}
+
+@keyframes ve-pj-fade { from { opacity: 0; } }
+@keyframes ve-pj-rise { from { transform: translateY(24px); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .ve-pj-sheet, .ve-pj-sheet-panel { animation: none; } }
+
+/* ---- Writing screen ---- */
+.ve-pj-writer { display: grid; gap: 10px; min-height: 100%; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.ve-pj-toolbar {
+  position: sticky;
+  top: -1px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px;
+  border: 1px solid var(--ve-border);
+  border-radius: 12px;
+  background: var(--ve-surface-up);
+  scrollbar-width: none;
+}
+.ve-mobile-app .ve-pj-layer button.ve-pj-tool {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--ve-text);
+  background: transparent;
+}
+.ve-pj-tool:active { background: var(--ve-surface); border-color: var(--ve-border); }
+.ve-pj-editor {
+  min-height: 55vh;
+  padding: 16px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--ve-border);
+  border-radius: 13px;
+  color: var(--ve-text);
+  background: var(--ve-surface);
+  line-height: 1.55;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.ve-pj-editor:focus-visible { border-color: var(--ve-character-accent); box-shadow: 0 0 0 1px var(--ve-character-accent); }
+.ve-pj-editor:empty::before { content: attr(data-placeholder); color: var(--ve-subtle); pointer-events: none; }
+.ve-pj-editor > :first-child { margin-top: 0; }
+.ve-pj-editor :is(h1, h2, h3) { margin: 1em 0 0.4em; font: 700 1.3em/1.2 Georgia, serif; }
+.ve-pj-editor h3 { font-size: 1.12em; }
+.ve-pj-editor p { margin: 0 0 0.7em; }
+.ve-pj-editor :is(ul, ol) { margin: 0 0 0.7em; padding-left: 1.4em; }
+.ve-pj-editor blockquote {
+  margin: 0 1.2em 0.7em;
+  padding: 2px 0;
+  color: color-mix(in srgb, var(--ve-text) 78%, var(--ve-subtle));
+  font-style: italic;
+}
+.ve-pj-editor img { max-width: 100%; height: auto; }
+.ve-pj-editor :is(.secret, section.secret) {
+  padding: 6px 10px;
+  border: 1px dashed color-mix(in srgb, var(--ve-gold) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ve-gold) 8%, transparent);
+}
+.ve-pj-save-status { justify-self: end; min-height: 1.2em; color: var(--ve-subtle); font-size: 0.75rem; }
+.ve-pj-save-status[data-state="error"] { color: var(--ve-red-bright, #e06b6b); text-decoration: underline; cursor: pointer; }
+.ve-pj-save-status[data-state="saving"]::before, .ve-pj-save-status[data-state="pending"]::before { content: "• "; color: var(--ve-gold); }
+.ve-pj-banner:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ve-gold) 60%, var(--ve-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ve-gold) 14%, var(--ve-surface));
+}
+.ve-pj-banner > span { flex: 1 1 100%; }
+
+/* ---- Picture pages ---- */
+.ve-pj-picture { display: grid; gap: 10px; margin: 0; }
+.ve-pj-picture > img {
+  width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  border: 1px solid var(--ve-border);
+  border-radius: 13px;
+  background: var(--ve-bg);
+}
+.ve-pj-picture > figcaption { display: grid; gap: 6px; }
+
+/* ---- My Journals on the Journals tab ---- */
+.ve-journal-mine { display: grid; gap: 8px; margin-bottom: 18px; }
+.ve-journal-mine > h3 { margin: 0; color: var(--ve-subtle); font-size: 0.7rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
+.ve-journal-library-heading { margin: 4px 0 8px; color: var(--ve-subtle); font-size: 0.7rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }

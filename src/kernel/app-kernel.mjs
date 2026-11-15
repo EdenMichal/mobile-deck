@@ -25,7 +25,7 @@ export function nativeSceneTileTapAllowed({ active, state, presentation }) {
 }
 
 // Own one activation transaction, its command boundary, presentation and deterministic shutdown.
-export function createAppKernel({ store, session, commandGateway, biographyGateway, itemDetailsGateway = null, craftingGateway = null, actorEditorGateway = null, builderGateway = null, combatGateway, cameraIntents, authoritativeGateway, canvasRecoveryGateway = null, loadTimingGateway = null, reloadApplication = () => globalThis.window?.location?.reload?.(), connectionGeneration, sceneGateway, templatePlacementGateway, nativeTokenPlacementGateway = null, actorTokenPlacementGateway = null, movementGateway, quickbarGateway, customHeaderGateway = null, hotbarGateway = null, actionBarPreferences = null, nativeChatGateway, armorClassGateway = null, diagnosticsJournalGateway = null, activeEffectContextGateway, actionSessionGateway, preferencesGateway, settingsCompatibilityGateway, moduleOverlayGateway, sessionStatusGateway, deviceIdentityGateway, controlsGuideGateway = null, isControlsUiReady = () => false, themeGateway, mobileBackGateway = null, mobileAssetGateway = null, lowMemoryGateway = null, graphicsProfileGateway = lowMemoryGateway, graphicsRecoveryGateway = null, metrics, diagnostics, performanceObserver = null, wakeLockController, pwaInstall = null, readPolicy, readGraphicsPolicy = () => null, watchGraphicsPolicy = () => () => {}, disable, preparePresentation = () => {}, createFrame = createAppFrame }) {
+export function createAppKernel({ store, session, commandGateway, biographyGateway, itemDetailsGateway = null, craftingGateway = null, actorEditorGateway = null, builderGateway = null, playerJournals = null, combatGateway, cameraIntents, authoritativeGateway, canvasRecoveryGateway = null, loadTimingGateway = null, reloadApplication = () => globalThis.window?.location?.reload?.(), connectionGeneration, sceneGateway, templatePlacementGateway, nativeTokenPlacementGateway = null, actorTokenPlacementGateway = null, movementGateway, quickbarGateway, customHeaderGateway = null, hotbarGateway = null, actionBarPreferences = null, nativeChatGateway, armorClassGateway = null, diagnosticsJournalGateway = null, activeEffectContextGateway, actionSessionGateway, preferencesGateway, settingsCompatibilityGateway, moduleOverlayGateway, sessionStatusGateway, deviceIdentityGateway, controlsGuideGateway = null, isControlsUiReady = () => false, themeGateway, mobileBackGateway = null, mobileAssetGateway = null, lowMemoryGateway = null, graphicsProfileGateway = lowMemoryGateway, graphicsRecoveryGateway = null, metrics, diagnostics, performanceObserver = null, wakeLockController, pwaInstall = null, readPolicy, readGraphicsPolicy = () => null, watchGraphicsPolicy = () => () => {}, disable, preparePresentation = () => {}, createFrame = createAppFrame }) {
   // Adapt the preference gateway's localizer for shared UI helpers.
   const localize = (key, fallback, data) => localizedText((id, _fallback, values) => preferencesGateway?.localize?.(id, values), key, fallback, data);
   let runtimeScope = null;
@@ -226,6 +226,12 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
       return builderGateway.open(request);
     },
     ...(builderGateway?.openCreator ? { openCharacterCreator: request => builderGateway.openCreator(request ?? {}) } : {}), // Character Builder (fork): absent on systems without the builder, so no New character row there
+    // Player journals: a player's private notes per character (null for GMs and when unavailable).
+    playerJournalCharacters: () => (playerJournals?.available?.() ? playerJournals.characters() : []),
+    openPlayerJournals: actorId => {
+      if (!playerJournals?.available?.()) throw new Error(localizedText(localize, "VEMOBILE.PlayerJournals.Unavailable", "My Journals is for players."));
+      return playerJournals.open(actorId);
+    },
     openNativeActorEditor: request => {
       requireCharacterView(request.actorSourceUuid);
       return guardConnection(expected => actorEditorGateway.open(request, expected, runtimeScope));
@@ -996,7 +1002,7 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
         diagnostics
       }) : null;
       runtimeScope.own(store.subscribe((state) => {
-        if (state.reconnect || state.modeTransition) { actorEditorGateway?.closeAll?.(); builderGateway?.close?.(); }
+        if (state.reconnect || state.modeTransition) { actorEditorGateway?.closeAll?.(); builderGateway?.close?.(); playerJournals?.close?.(); }
         const placement = state.actorTokenPlacement;
         if (placement && (state.route !== "scene" || state.templatePlacement || state.reconnect || state.modeTransition
           || !state.snapshot?.scene?.canvasReady || String(state.snapshot.scene.id) !== placement.sceneId

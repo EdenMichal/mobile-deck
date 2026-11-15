@@ -1,6 +1,8 @@
 import { localizeFoundry } from "./localization.mjs";
 import { actorSourceRecord, actorSourceUuid, resolveActorSource, validSourceUuid } from "./character-source.mjs";
 import { selectSystemIntegration, assertSystemIntegration } from "./system-integration.mjs";
+import { MODULE_ID } from "./preferences.mjs";
+import { PLAYER_JOURNAL_FLAG, ROLES as PLAYER_JOURNAL_ROLES } from "../kernel/player-journal-rules.mjs";
 import { clampJournalFontSize, DEFAULT_JOURNAL_FONT_SIZE, MIN_JOURNAL_FONT_SIZE, MAX_JOURNAL_FONT_SIZE } from "../kernel/journal-font-size.mjs";
 
 const TOKEN_GEOMETRY_FIELDS = new Set(["x", "y", "elevation", "rotation", "sort"]);
@@ -12,9 +14,9 @@ export const SESSION_INVALIDATION_MAP = Object.freeze({
   createMacro: Object.freeze(["scene"]),
   updateMacro: Object.freeze(["scene"]),
   deleteMacro: Object.freeze(["scene"]),
-  createFolder: Object.freeze(["scene"]),
-  updateFolder: Object.freeze(["scene"]),
-  deleteFolder: Object.freeze(["scene"]),
+  createFolder: Object.freeze(["scene", "journals"]),
+  updateFolder: Object.freeze(["scene", "journals"]),
+  deleteFolder: Object.freeze(["scene", "journals"]),
   createActor: Object.freeze(["actors"]),
   updateActor: Object.freeze(["actors"]),
   deleteActor: Object.freeze(["actors"]),
@@ -779,6 +781,8 @@ function journalRecord(journal) {
     sort: Number(journal.sort) || 0,
     rootSorting: sortingMode(game.journal?.sortingMode),
     folderPath: journalFolderPath(journal),
+    // Inside Player Journals: shown under My Journals for players, so the Library leaves it out.
+    playerJournal: inPlayerJournals(journal),
     pages: Array.from(journal.pages ?? [])
       .filter((page) => canObserve(page, game.user))
       .map((page) => ({ id: page.id, name: page.name, type: page.type }))
@@ -801,6 +805,18 @@ function journalFolderPath(journal) {
     folder = folder.folder ?? folder.parent ?? null;
   }
   return folders;
+}
+
+// True when a journal sits anywhere inside the Player Journals folder (found by flag, not name).
+function inPlayerJournals(journal) {
+  const seen = new Set();
+  let folder = journal.folder ?? null;
+  while (folder && !seen.has(folder.id)) {
+    seen.add(folder.id);
+    if (folder.flags?.[MODULE_ID]?.[PLAYER_JOURNAL_FLAG]?.role === PLAYER_JOURNAL_ROLES.ROOT) return true;
+    folder = folder.folder ?? folder.parent ?? null;
+  }
+  return false;
 }
 
 // Read the configured Scene or Journal sorting mode for stable record order.

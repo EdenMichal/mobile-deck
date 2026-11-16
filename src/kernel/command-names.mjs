@@ -28,6 +28,7 @@ export const ACTOR_COMMANDS = Object.freeze({
   EDIT_HIT_POINTS: "actor.edit-hit-points",
   ADD_EXPERIENCE: "actor.add-experience",
   UPDATE_BIOGRAPHY_SECTION: "actor.update-biography-section",
+  UPDATE_IDENTITY: "actor.update-identity", // Player feedback (fork): change the name and portrait after creation
   UPDATE_CURRENCY: "actor.update-currency",
   SET_SPELL_SLOT_VALUE: "actor.set-spell-slot-value",
   SET_ITEM_EQUIPPED: "actor.set-item-equipped",

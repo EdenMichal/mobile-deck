@@ -11920,7 +11920,7 @@ body[data-ve-memory-profile="maximum"] .ve-mobile-app .ve-character-inspiration.
   font-weight: 800;
 }
 
-.ve-biography-editor :is(input, textarea) {
+.ve-biography-editor :is(input, textarea, .ve-biography-rich-editor) {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -11934,6 +11934,38 @@ body[data-ve-memory-profile="maximum"] .ve-mobile-app .ve-character-inspiration.
 
 .ve-biography-editor input { min-height: 44px; padding: 8px 9px; }
 .ve-biography-editor textarea { min-height: 150px; padding: 10px; resize: vertical; }
+.ve-biography-editor .ve-biography-rich-editor {
+  min-height: 220px;
+  max-height: 55dvh;
+  padding: 10px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  font-size: 0.86rem;
+  font-weight: 400;
+  text-align: start;
+  outline: none;
+  touch-action: auto;
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.ve-biography-editor .ve-biography-rich-editor:focus-visible { border-color: var(--ve-character-accent); }
+.ve-biography-editor .ve-biography-rich-editor > :first-child { margin-top: 0; }
+.ve-biography-editor .ve-biography-rich-editor p { margin: 0 0 0.7em; }
+
+/* Player feedback (fork): name and portrait card and editor. */
+.ve-character-identity-body { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-width: 0; }
+.ve-character-identity-portrait { flex: none; width: 56px; height: 56px; border-radius: 12px; object-fit: cover; object-position: top center;
+  border: 1px solid var(--ve-border); background: var(--ve-surface-up); }
+.ve-character-identity-portrait.is-empty { display: grid; place-items: center; color: var(--ve-subtle); }
+.ve-character-identity-body strong { min-width: 0; overflow-wrap: anywhere; font-family: Georgia, "Times New Roman", serif; font-size: 1rem; }
+.ve-identity-editor-portrait { display: flex; align-items: center; gap: 12px; margin: 12px 0 8px; }
+.ve-identity-editor-portrait .ve-character-identity-preview { flex: none; width: 96px; height: 96px; border-radius: 14px; object-fit: cover;
+  object-position: top center; border: 1px solid var(--ve-border); background: var(--ve-surface-up); }
+.ve-identity-editor-portrait-actions { display: grid; gap: 8px; flex: 1; min-width: 0; }
+.ve-identity-editor-token { display: flex; align-items: center; gap: 8px; color: var(--ve-subtle); font-size: 0.72rem; font-weight: 700; }
+.ve-identity-editor-token input { width: 20px; height: 20px; margin: 0; accent-color: var(--ve-character-accent); }
+.ve-identity-editor.is-pending { opacity: 0.8; }
 .ve-biography-editor-status { min-height: 19px; margin: 8px 2px; color: var(--ve-subtle); font-size: 0.68rem; text-align: center; }
 .ve-biography-editor-status.is-error { color: #ee7b7b; }
 
@@ -13649,3 +13681,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .ve-bottom-nav .ve-chat-unread-badge[hidden] { display: none; }
 
 .ve-main-nav-item[data-route="journals"] > .ve-sheet-tab-icon { transform: scale(1.14); transform-origin: center bottom; }
+
+/* Player feedback (fork): Weapon masteries card. */
+.ve-mastery-preview .ve-mastery-note { margin: 6px 0 0; color: var(--ve-character-accent); font-size: 0.7rem; font-weight: 800; }
+.ve-mastery-preview .ve-sheet-card-action.is-attention { color: var(--ve-character-accent); }

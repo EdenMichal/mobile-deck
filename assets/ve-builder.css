@@ -889,3 +889,22 @@
 .ve-builder-row-badge { display: block; font-size: 0.8em; color: var(--ve-subtle); }
 .ve-builder-row-badge.is-submitted { color: var(--ve-gold); }
 .ve-builder-row-badge.is-rejected { color: var(--ve-red-bright, var(--ve-red)); }
+
+/* Player feedback (fork): Manage spells. */
+.ve-builder .ve-builder-spell-counter.is-over strong { color: var(--ve-red-bright, var(--ve-red)); font-weight: 700; }
+.ve-spell-manager-card .ve-builder-spell-counters { margin: 0 12px; }
+.ve-spell-manager-card > .ve-builder-hint { margin: 8px 13px; }
+.ve-spell-manager-card > .ve-builder-empty { margin: 8px 13px 12px; }
+.ve-spell-manager-card .ve-builder-card-actions { padding-top: 12px; }
+.ve-spell-manager-fixed { display: grid; place-items: center; color: var(--ve-subtle); font-size: 0.8rem; }
+.ve-mobile-app .ve-builder button.ve-spell-manager-remove { color: var(--ve-subtle); }
+.ve-spell-manager-notice:empty { display: none; }
+.ve-spell-manager-notice { margin: 0 2px 10px; color: var(--ve-character-accent); font-weight: 700; }
+
+/* Player feedback (fork): Weapon Mastery picker. */
+.ve-mastery-card .ve-builder-spell-counters { margin: 12px 12px 0; }
+.ve-mastery-hint { margin: 10px 13px 0; }
+.ve-mastery-hint.is-error { color: var(--ve-red-bright, var(--ve-red)); font-weight: 700; }
+.ve-mobile-app .ve-builder button.ve-mastery-chip { display: inline-grid; gap: 1px; text-align: center; }
+.ve-mobile-app .ve-builder button.ve-mastery-chip small { color: var(--ve-subtle); font-size: 0.6rem; font-weight: 700; }
+.ve-mobile-app .ve-builder button.ve-mastery-chip.is-selected small { color: inherit; }

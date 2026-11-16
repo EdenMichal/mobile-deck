@@ -226,8 +226,26 @@ const GM_ACTIONS = Object.freeze({
     const path = String(response?.path ?? "");
     if (!path) throw journalError("COMMAND_FAILED", "Errors.UploadFailed", "The picture couldn't be saved on the server.");
     return { path };
+  },
+  // Player feedback (fork): a character portrait the phone already shrank, in this world's portraits folder for the player.
+  async uploadPortrait(data, requester, { game, FilePicker }) {
+    return { path: await storePortrait(data, requester, { game, FilePicker }) };
   }
 });
+
+// Save a shrunk portrait under worlds/<world>/mobile-deck/portraits/<user>; returns the stored path.
+async function storePortrait(data, user, { game, FilePicker }) {
+  if (!FilePicker?.upload) throw journalError("CAPABILITY_UNAVAILABLE", "Errors.NoUpload", "Pictures can't be uploaded on this server.");
+  const image = ruled(() => checkImageUpload(data?.dataUrl));
+  const directory = `worlds/${game.world.id}/mobile-deck/portraits/${user.id}`;
+  await ensureDirectory(FilePicker, directory);
+  const blob = await (await fetch(String(data.dataUrl))).blob();
+  const file = new File([blob], imageFileName(data?.name || "portrait", image.extension, Date.now().toString(36)), { type: image.mime });
+  const response = await FilePicker.upload("data", directory, file, {}, { notify: false });
+  const path = String(response?.path ?? "");
+  if (!path) throw journalError("COMMAND_FAILED", "Errors.UploadFailed", "The picture couldn't be saved on the server.");
+  return path;
+}
 
 // Make each missing level of a data-folder path. Foundry refuses to make one that exists, which is fine.
 async function ensureDirectory(FilePicker, path) {
@@ -387,6 +405,32 @@ export function createPlayerJournalGateway({ getGame = () => globalThis.game, ge
     deleteFolder: folderId => ask("deleteFolder", { folderId }),
     createJournal: (folderId, name) => ask("createJournal", { folderId, name: ruled(() => cleanName(name)) }),
     uploadImage: (dataUrl, name) => ask("uploadImage", { dataUrl, name: String(name ?? "").slice(0, 100) }, UPLOAD_TIMEOUT),
+    // Player feedback (fork): a user who may upload stores the portrait itself; anyone else asks the GM's client.
+    async uploadPortrait(dataUrl, name) {
+      const game = getGame();
+      const data = { dataUrl, name: String(name ?? "").slice(0, 100) };
+      if (game?.user?.isGM || game?.user?.can?.("FILES_UPLOAD")) {
+        const FilePicker = globalThis.foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+        return { path: await storePortrait(data, game.user, { game, FilePicker }) };
+      }
+      return ask("uploadPortrait", data, UPLOAD_TIMEOUT);
+    },
+    canBrowseImages: () => {
+      const game = getGame();
+      return Boolean(game?.user?.isGM || game?.user?.can?.("FILES_BROWSE"));
+    },
+    // Foundry's own file browser, images only; resolves to the chosen path, or null when closed.
+    browseImages(current = "") {
+      const FilePicker = globalThis.foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+      if (!FilePicker) return Promise.resolve(null);
+      return new Promise(resolve => {
+        let settled = false;
+        const settle = value => { if (!settled) { settled = true; resolve(value); } };
+        const picker = new FilePicker({ type: "image", current: String(current ?? ""), callback: path => settle(String(path ?? "") || null) });
+        try { picker.addEventListener?.("close", () => setTimeout(() => settle(null), 0)); } catch { /* older picker */ }
+        Promise.resolve(picker.render({ force: true })).catch(() => settle(null));
+      });
+    },
 
     // Things a journal's owner does directly.
     async renameJournal(journalId, name) {

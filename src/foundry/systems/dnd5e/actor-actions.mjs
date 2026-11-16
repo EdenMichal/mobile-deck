@@ -29,6 +29,7 @@ const handlers = Object.freeze({
   [ACTOR_COMMANDS.EDIT_HIT_POINTS]: (actor, payload) => editHitPoints(actor, payload),
   [ACTOR_COMMANDS.ADD_EXPERIENCE]: (actor, payload) => addExperience(actor, payload),
   [ACTOR_COMMANDS.UPDATE_BIOGRAPHY_SECTION]: (actor, payload) => updateBiographySection(actor, payload),
+  [ACTOR_COMMANDS.UPDATE_IDENTITY]: (actor, payload) => updateIdentity(actor, payload), // Player feedback (fork)
   [ACTOR_COMMANDS.UPDATE_CURRENCY]: (actor, payload) => updateCurrency(actor, payload),
   [ACTOR_COMMANDS.SET_SPELL_SLOT_VALUE]: (actor, payload) => setSpellSlotValue(actor, payload),
   [ACTOR_COMMANDS.SET_ITEM_EQUIPPED]: (actor, payload) => setItemEquipped(actor, payload),
@@ -187,6 +188,56 @@ async function updateBiographySection(actor, payload) {
   const changed = value !== current;
   if (changed) await actor.update({ [`system.details.${section}`]: value });
   return Object.freeze({ section, changed });
+}
+
+/**
+ * Player feedback (fork): change a character's name and portrait after creation. The prototype token follows the
+ * name when it had the old name, and takes the portrait only when asked (tokens are often top-down art).
+ * Linked tokens on the viewed Scene that had the old name follow too, when this user may change them.
+ */
+async function updateIdentity(actor, payload) {
+  if (!["character", "npc"].includes(actor.type) || typeof actor.update !== "function") {
+    throw new CommandError("CAPABILITY_UNAVAILABLE", localizeFoundry("VEMOBILE.Character.CommandGateway.IdentityCannotBeEdited", "This actor's name and portrait cannot be changed here."));
+  }
+  const name = String(payload?.name ?? "").replace(/\s+/gu, " ").trim();
+  if (!name || name.length > 120) throw new CommandError("INVALID_INPUT", localizeFoundry("VEMOBILE.Character.CommandGateway.NameInvalid", "Enter a name of up to 120 characters."));
+  const img = identityImagePath(payload?.img);
+  if (String(payload?.originalName ?? "") !== actor.name || String(payload?.originalImg ?? "") !== String(actor.img ?? "")) {
+    throw new CommandError("STALE_STATE", localizeFoundry("VEMOBILE.Character.CommandGateway.IdentityChanged", "The name or portrait changed while it was being edited."));
+  }
+  const updates = {};
+  if (name !== actor.name) {
+    updates.name = name;
+    if (actor.prototypeToken?.name === actor.name) updates["prototypeToken.name"] = name;
+  }
+  if (img && img !== actor.img) {
+    updates.img = img;
+    if (payload?.tokenToo === true) updates["prototypeToken.texture.src"] = img;
+  }
+  if (!Object.keys(updates).length) return Object.freeze({ changed: false });
+  const oldName = actor.name;
+  await actor.update(updates);
+  if (updates.name) {
+    const tokens = typeof actor.getActiveTokens === "function" ? actor.getActiveTokens(true, true) : [];
+    for (const token of tokens) {
+      if (token?.name !== oldName || !token.actorLink || !token.canUserModify?.(globalThis.game?.user, "update")) continue;
+      try { await token.update({ name }); } catch (error) { console.warn("Mobile Deck | a token kept its old name", error); }
+    }
+  }
+  return Object.freeze({ changed: true, name: actor.name, img: actor.img });
+}
+
+// A portrait is a relative data path or an http(s) URL to an image; anything else is refused.
+function identityImagePath(value) {
+  const path = String(value ?? "").trim();
+  if (!path) return "";
+  const lower = path.toLowerCase().split(/[?#]/u)[0];
+  const image = /\.(?:webp|png|jpe?g|gif|avif|svg)$/u.test(lower);
+  const scheme = /^[a-z][a-z0-9+.-]*:/u.exec(lower)?.[0] ?? "";
+  if (path.length > 1000 || !image || (scheme && !["http:", "https:"].includes(scheme)) || path.includes("..")) {
+    throw new CommandError("INVALID_INPUT", localizeFoundry("VEMOBILE.Character.CommandGateway.PortraitInvalid", "Choose an image file for the portrait."));
+  }
+  return path;
 }
 
 // Update the displayed identity fields only after rechecking every original value for stale edits.
@@ -373,6 +424,7 @@ function commandFingerprint(name, actorId, payload) {
   let option = payload.ability;
   if (name === ACTOR_COMMANDS.USE_ITEM || name === ACTOR_COMMANDS.OPEN_ITEM_SHEET || name === ACTOR_COMMANDS.DELETE_ITEM) option = payload.itemId;
   else if (name === ACTOR_COMMANDS.UPDATE_BIOGRAPHY_SECTION) option = `${payload.section}:${payload.biographyField ?? ""}`;
+  else if (name === ACTOR_COMMANDS.UPDATE_IDENTITY) option = "identity";
   else if (name === ACTOR_COMMANDS.SET_SPELL_PREPARED) option = `${payload.itemId}:${payload.prepared}`;
   else if (name === ACTOR_COMMANDS.SET_ITEM_EQUIPPED) option = `${payload.itemId}:${payload.equipped}`;
   else if (name === ACTOR_COMMANDS.SET_ITEM_ATTUNED) option = `${payload.itemId}:${payload.attuned}`;

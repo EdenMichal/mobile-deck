@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Biography paragraphs.** The Biography editor is now a text editor like My Journals: Return starts a new paragraph, pasted text comes in as plain text, and only Save saves. In the Characteristics fields, Return moves to the next field.
+- **Name and portrait.** A Name and portrait card on the Biography tab changes the character's name and portrait after creation: upload a picture from the phone (through the GM's client for players who can't upload) or choose one from Foundry's files, optionally for the token too.
+- **Manage spells.** The wand on the Spells tab adds spells from a class's spell list and removes the class's own picks, with the class's limits shown as counters. No GM approval.
+- **Weapon masteries.** A Weapon masteries card on the Overview. The picker lists proficient weapons first and the rest greyed out. New picks open when a level raises the count (from the class data, or the 2024 tables when the data has no Weapon Mastery step), and a Long Rest allows changing one. A GM can set anything.
+- **Eldritch invocations.** Agonizing Blast, Eldritch Spear and Repelling Blast can be taken again only while there is another damage cantrip for them.
+
 ## Mobile Deck 1.1.0
 
 - **My Journals.** Players keep private notes for each of their characters on the Journals tab: make folders and journals, write text pages on a phone-sized writing screen that saves on its own, add pictures from the phone, and rename, move, reorder or delete any of it. Notes are ordinary Foundry journals in a **Player Journals** folder (one folder per player, one per character) that only the player and the GM can open in Foundry (as with any Foundry journal, the data still reaches every connected browser). Writing works with no GM online; new folders, new journals and pictures need a GM online, because Foundry lets only GMs make folders and, by default, only Trusted players make journals and Assistant GMs upload files.

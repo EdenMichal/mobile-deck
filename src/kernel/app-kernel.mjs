@@ -225,9 +225,23 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
       if (!builderGateway) throw new Error(localizedText(localize, "VEMOBILE.Builder.Unavailable", "Level up isn't available for this game system."));
       return builderGateway.open(request);
     },
+    // Player feedback (fork): the Manage spells layer (the wand on the Spells tab).
+    ...(builderGateway?.openSpellManager ? {
+      canManageSpells: request => { try { return builderGateway.canManageSpells(request); } catch { return false; } },
+      openSpellManager: request => { requireCharacterView(request?.actorSourceUuid); return builderGateway.openSpellManager(request); },
+      weaponMasterySummary: request => { try { return builderGateway.masterySummary(request); } catch { return null; } },
+      openMasteryPicker: request => { requireCharacterView(request?.actorSourceUuid); return builderGateway.openMasteryPicker(request); }
+    } : {}),
     ...(builderGateway?.openCreator ? { openCharacterCreator: request => builderGateway.openCreator(request ?? {}) } : {}), // Character Builder (fork): absent on systems without the builder, so no New character row there
     // Player journals: a player's private notes per character (null for GMs and when unavailable).
     playerJournalCharacters: () => (playerJournals?.available?.() ? playerJournals.characters() : []),
+    // Player feedback (fork): store a portrait the phone already shrank (directly, or through the GM's client).
+    uploadCharacterPortrait: (dataUrl, name) => {
+      if (!playerJournals?.uploadPortrait) throw new Error(localizedText(localize, "VEMOBILE.Character.Identity.UploadUnavailable", "Pictures can't be uploaded here."));
+      return playerJournals.uploadPortrait(dataUrl, name);
+    },
+    canBrowseImages: () => Boolean(playerJournals?.canBrowseImages?.()),
+    browseImages: current => playerJournals?.browseImages?.(current) ?? Promise.resolve(null),
     openPlayerJournals: actorId => {
       if (!playerJournals?.available?.()) throw new Error(localizedText(localize, "VEMOBILE.PlayerJournals.Unavailable", "My Journals is for players."));
       return playerJournals.open(actorId);
@@ -777,10 +791,10 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
         : store.state.route === "scene" ? store.state.snapshot?.scene?.quickbarActorSourceUuid || store.state.selectedActorSourceUuid : "";
       if (sourceUuid && sourceUuid !== visibleSource) return Promise.reject(new Error(localizedText(localize, "VEMOBILE.Interface.AppKernel.TheSelectedActorSourceChangedBeforeThisActionCould", "The selected Actor source changed before this action could run.")));
       if ([ACTOR_COMMANDS.ADD_EXPERIENCE, ACTOR_COMMANDS.UPDATE_CURRENCY, ACTOR_COMMANDS.SET_SPELL_SLOT_VALUE, ACTOR_COMMANDS.SET_ITEM_EQUIPPED, ACTOR_COMMANDS.SET_ITEM_ATTUNED, ACTOR_COMMANDS.SET_ITEM_FAVORITE, ACTOR_COMMANDS.SET_SPELL_PREPARED, ACTOR_COMMANDS.EDIT_PF2E_SPELL_PREPARATION, ACTOR_COMMANDS.EDIT_PF2E_PLAY, ACTOR_COMMANDS.EDIT_PF2E_INVENTORY, ACTOR_COMMANDS.EDIT_PF2E_EFFECT, ACTOR_COMMANDS.EDIT_PF2E_PERSISTENT_DAMAGE, ACTOR_COMMANDS.EDIT_PF2E_SPELLS, ACTOR_COMMANDS.EDIT_PF2E_CRAFTING, ACTOR_COMMANDS.EDIT_PF2E_SOCIETY, ACTOR_COMMANDS.OPEN_ITEM_SHEET, ACTOR_COMMANDS.CREATE_ITEM, ACTOR_COMMANDS.DELETE_ITEM, ACTOR_COMMANDS.TRANSFER_PARTY_ITEM, ACTOR_COMMANDS.TRANSFER_PARTY_CURRENCY].includes(name)
-        || name === ACTOR_COMMANDS.UPDATE_BIOGRAPHY_SECTION || name === ACTOR_COMMANDS.SET_EXHAUSTION_LEVEL) {
+        || name === ACTOR_COMMANDS.UPDATE_BIOGRAPHY_SECTION || name === ACTOR_COMMANDS.UPDATE_IDENTITY || name === ACTOR_COMMANDS.SET_EXHAUSTION_LEVEL) {
         const sourceUuid = String(payload?.actorSourceUuid ?? "");
         if (store.state.route !== "characters" || store.state.selectedActorSourceUuid !== sourceUuid
-          || (name === ACTOR_COMMANDS.UPDATE_BIOGRAPHY_SECTION && store.state.characterTab !== "biography") || (name === ACTOR_COMMANDS.EDIT_PF2E_CRAFTING && store.state.characterTab !== "crafting") || (name === ACTOR_COMMANDS.EDIT_PF2E_SOCIETY && store.state.characterTab !== "society")) {
+          || ([ACTOR_COMMANDS.UPDATE_BIOGRAPHY_SECTION, ACTOR_COMMANDS.UPDATE_IDENTITY].includes(name) && store.state.characterTab !== "biography") || (name === ACTOR_COMMANDS.EDIT_PF2E_CRAFTING && store.state.characterTab !== "crafting") || (name === ACTOR_COMMANDS.EDIT_PF2E_SOCIETY && store.state.characterTab !== "society")) {
           return Promise.reject(new Error(localizedText(localize, "VEMOBILE.Interface.AppKernel.TheSelectedCharacterSourceChangedBeforeThisActionCould", "The selected character source changed before this action could run.")));
         }
       }

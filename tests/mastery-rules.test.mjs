@@ -1,7 +1,7 @@
 // Unit tests for the Weapon Mastery rules (player feedback). Run: node --test tests/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkMasteryChange, isProficient, masteryAllowance, tableMasteries } from "../src/foundry/systems/dnd5e/builder/mastery-rules.mjs";
+import { checkMasteryChange, isProficient, masteryAllowance, shouldAskSwap, tableMasteries } from "../src/foundry/systems/dnd5e/builder/mastery-rules.mjs";
 
 test("the 2024 tables", () => {
   assert.equal(tableMasteries("fighter", 1), 3);
@@ -48,4 +48,12 @@ test("proficiency by weapon or category", () => {
   assert.ok(isProficient(["mar"], "longsword", "mar"));
   assert.ok(isProficient(["longsword"], "longsword", "mar"));
   assert.ok(!isProficient(["sim"], "longsword", "mar"));
+});
+
+test("shouldAskSwap: the owning player is asked; a GM only for a character no active player owns, on the client that rested", () => {
+  assert.equal(shouldAskSwap({ isOwner: true }), true, "the player who owns it, wherever the rest was taken");
+  assert.equal(shouldAskSwap({ isOwner: false }), false, "another player sees nothing");
+  assert.equal(shouldAskSwap({ isGM: true, isOwner: true, playerOwnerActive: true, byThisUser: true }), false, "the GM rested a player's character: the player is asked");
+  assert.equal(shouldAskSwap({ isGM: true, isOwner: true, playerOwnerActive: false, byThisUser: true }), true, "no player online: the GM who rested is asked");
+  assert.equal(shouldAskSwap({ isGM: true, isOwner: true, playerOwnerActive: false, byThisUser: false }), false, "not every GM client");
 });

@@ -549,6 +549,12 @@ if (isGamePage) {
   const activeEffectContextGateway = systemIntegration.services.activeEffects({ diagnostics });
   const actionSessionGateway = systemIntegration.services.actionSession();
   const builderGateway = systemIntegration.services.builder?.() ?? null; // Character Builder (fork)
+  // Weapon masteries: dnd5e's weapon index is built on first use, so the sheet's card would name no mastery. Load it
+  // once ready, then redraw the sheet.
+  Hooks.once("ready", () => {
+    void builderGateway?.loadMasteries?.().then(loaded => { if (loaded) kernel?.refresh?.(); })
+      .catch(error => console.warn("Mobile Deck | weapon masteries could not be loaded", error));
+  });
   systemIntegration.services.partyRelay?.(); // Party inventory moves run on the active GM's client
   // Player journals: the GM's client answers players and keeps their folders, even on desktop.
   const playerJournalGateway = createPlayerJournalGateway();

@@ -8170,6 +8170,13 @@ details.ve-action-session-compact-result {
   white-space: nowrap;
 }
 
+.ve-mastery-preview .ve-trait-pills small {
+  margin-left: 5px;
+  color: var(--ve-subtle);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
 .ve-traits-preview .ve-sheet-card-heading {
   min-height: 40px;
   padding: 6px 11px;

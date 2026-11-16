@@ -68,6 +68,12 @@ function traitKeys(trait) {
   return traitKeyCache.get(trait);
 }
 
+/** creation's prepareItem for a species or background (also edits that replace one): origin data fixes, trait keys. */
+export async function prepareOriginData(data, source) {
+  prepareOriginItem(data, originOptions(source));
+  await canonicalTraitKeys(data, traitKeys);
+}
+
 export function originOptions(doc) {
   const abilities = globalThis.CONFIG?.DND5E?.abilities ?? {};
   const labels = Object.fromEntries(Object.entries(abilities).map(([k, a]) => [k, globalThis.game?.i18n?.localize?.(a?.label ?? "") || ""]));

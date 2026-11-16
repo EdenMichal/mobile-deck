@@ -7,6 +7,7 @@ import { blockerTextFor, choiceList, conflictBanner, emptyCard, STEP_SCREENS } f
 import { cardAction, rowArt, rowCopy, sheetCard } from "./ve-parts.mjs";
 import { isWaiting, touchesBuilderFlag } from "../../foundry/systems/dnd5e/builder/approval-rules.mjs";
 import { MODULE_ID } from "../../foundry/preferences.mjs";
+import { EDIT_SCREENS } from "./edit-screens.mjs";
 
 export function mountBuilder(host, controller, { t, onClose = () => {} }) {
   let answerFn = null;
@@ -32,7 +33,7 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
       }
     });
     const ctx = ctxFor(s);
-    const render = STEP_SCREENS[model.type] ?? STEP_SCREENS.unsupported;
+    const render = STEP_SCREENS[model.type] ?? EDIT_SCREENS[model.type] ?? STEP_SCREENS.unsupported;
     const screen = render(model, ctx, s);
     answerFn = screen.answer;
     setBody(
@@ -77,7 +78,8 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
     const draft = home.draft ? draftCard(
       waits ? t("Approval.LevelWaiting", "Waiting for GM approval: {label}", { label: home.draft.label })
         : status === "rejected" ? t("Approval.LevelRejected", "Your GM sent back {label}: {reason}", { label: home.draft.label, reason: home.draft.rejectReason })
-          : t("DraftFound", "You have a level-up in progress: {label}", { label: home.draft.label }), [
+          : home.draft.edit ? t("Edit.DraftFound", "You have a change in progress: {label}", { label: home.draft.label })
+            : t("DraftFound", "You have a level-up in progress: {label}", { label: home.draft.label }), [
         node("button", { className: "ve-builder-primary", attrs: { type: "button", "data-action": "resume" },
           children: [node("span", { text: waits ? t("Approval.View", "View") : t("Continue", "Continue") })],
           on: { click: () => work(async () => showView(await controller.resume())) } }, s),
@@ -94,6 +96,10 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
       home.classes.length ? sheetCard({ title: t("PickClass", "Which class gains a level?"), iconName: "fa-angles-up",
         children: [node("div", { className: "ve-builder-cards ve-builder-list", children: home.classes.map(classButton) })] }) : null,
       multiclassToggle, multiclassHost,
+      sheetCard({ children: [node("button", { className: "ve-builder-link ve-sheet-item-row", attrs: { type: "button", "data-action": "edit-choices", disabled: home.locked },
+        children: [rowArt(null, "fa-pen-to-square"), rowCopy(t("Edit.Heading", "Change choices"),
+          node("small", { text: t("Edit.HomeHint", "Skills, feats, subclass, ability scores, species, background…") })), icon("fa-chevron-right")],
+        on: { click: () => work(async () => showEditHome()) } }, s)] }),
       sheetCard({ children: [node("button", { className: "ve-builder-link ve-sheet-item-row", attrs: { type: "button" },
         children: [rowArt(null, "fa-clock-rotate-left"), rowCopy(t("History", "Change history")), icon("fa-chevron-right")],
         on: { click: () => showHistory() } }, s)] })
@@ -104,7 +110,8 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
     if (isWaiting(view)) return showWaiting(view);
     waiting = false;
     const submit = view.mode === "submit";
-    const s = frame({ screen: "review", heading: t("Review", "Review changes"), sub: `${view.from} → ${view.to}`, percent: 100,
+    const edit = view.kind === "edit";
+    const s = frame({ screen: "review", heading: t("Review", "Review changes"), sub: edit ? view.heading : `${view.from} → ${view.to}`, percent: 100,
       back: view.canBack ? () => work(async () => showView(await controller.back())) : null,
       next: () => work(async () => (submit ? showWaiting(await controller.submit()) : showDone(await controller.commit()))),
       nextText: submit ? t("Creation.Submit", "Submit for approval") : t("Commit", "Commit"), nextIcon: submit ? "fa-paper-plane" : "fa-check" });
@@ -113,7 +120,8 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
     setBody(
       sentBackGroup(view, t),
       node("p", { className: "ve-builder-lead", text: submit ? t("Approval.LevelSubmitLead", "Check everything below. Submit sends it to your GM, who approves it or sends it back with a note.")
-        : t("ReviewLead", "Check everything below. Commit applies it all at once; your GM gets this summary.") }),
+        : edit ? t("Edit.ReviewLead", "Check everything below. Commit changes your character; your GM gets this summary.")
+          : t("ReviewLead", "Check everything below. Commit applies it all at once; your GM gets this summary.") }),
       ...(groups.length ? groups : [emptyCard(t("NoChanges", "Nothing changes."))])
     );
   }
@@ -131,12 +139,73 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
 
   function showDone(entry, approvedBy = "") {
     waiting = false;
-    frame({ screen: "done", heading: t("Done", "Level up complete"), sub: entry.after.label, percent: 100, next: () => close(), nextText: t("Close", "Close"), nextIcon: "fa-check" });
+    const edit = entry.kind === "edit";
+    frame({ screen: "done", heading: edit ? t("Edit.Done", "Changes saved") : t("Done", "Level up complete"), sub: entry.label || entry.after.label, percent: 100, next: () => close(), nextText: t("Close", "Close"), nextIcon: "fa-check" });
     setBody(
       node("p", { className: "ve-builder-lead", text: approvedBy
-        ? t("Approval.LevelDoneLead", "{from} → {to}. Approved by {gm}.", { from: entry.before.label, to: entry.after.label, gm: approvedBy })
-        : t("DoneLead", "{from} → {to}. A summary was sent to your GM.", { from: entry.before.label, to: entry.after.label }) }),
+        ? (edit ? t("Approval.EditDoneLead", "{label}. Approved by {gm}.", { label: entry.label || entry.after.label, gm: approvedBy })
+          : t("Approval.LevelDoneLead", "{from} → {to}. Approved by {gm}.", { from: entry.before.label, to: entry.after.label, gm: approvedBy }))
+        : edit ? t("Edit.DoneLead", "Your character is updated. A summary was sent to your GM.")
+          : t("DoneLead", "{from} → {to}. A summary was sent to your GM.", { from: entry.before.label, to: entry.after.label }) }),
       ...historyGroups(entry)
+    );
+  }
+
+  /** Change choices (spec 2026-11-16): ability scores, then the species, background, classes and feats with choices. */
+  function showEditHome() {
+    const overview = controller.editOverview();
+    const s = frame({ screen: "edit", heading: t("Edit.Heading", "Change choices"), sub: controller.actorName, back: () => showHome() });
+    const start = target => work(async () => showView(await controller.startEdit(target)));
+    const row = (art, title, sub, onClick, attrs = {}) => node("button", { className: "ve-builder-card ve-sheet-item-row", attrs: { type: "button", ...attrs },
+      children: [art, rowCopy(title, sub ? node("small", { text: sub }) : null), node("span", { className: "ve-builder-card-check", attrs: { "aria-hidden": "true" }, children: [icon("fa-chevron-right")] })],
+      on: { click: onClick } }, s);
+    const TYPE_LABELS = { race: t("Tab.Species", "Species"), background: t("Tab.Background", "Background"), class: t("Tab.Class", "Class") };
+    const groupCard = g => {
+      const rows = g.rows.map(r => {
+        const where = r.level ? t("Edit.Level", "Level {level}", r) : t("Edit.Origin", "Starting choices");
+        const title = r.subclass ? `${where} · ${r.subclass}` : where;
+        return row(rowArt(null, r.subclass ? "fa-shield-halved" : "fa-list-check"), `${title}: ${r.titles.join(", ")}`, r.summary,
+          () => start({ kind: "modify", itemId: r.itemId, level: r.level }), { "data-edit-item": r.itemId, "data-edit-level": String(r.level) });
+      });
+      const actions = [
+        g.canReplace ? node("button", { className: "ve-builder-secondary", attrs: { type: "button", "data-action": "replace", "data-edit-item": g.itemId },
+          children: [icon("fa-right-left"), node("span", { text: t("Edit.Replace", "Replace {type}", { type: (TYPE_LABELS[g.type] ?? g.name).toLowerCase() }) })],
+          on: { click: () => work(async () => showReplace(g)) } }, s) : null,
+        g.canRemove ? node("button", { className: "ve-builder-secondary", attrs: { type: "button", "data-action": "remove", "data-edit-item": g.itemId },
+          children: [icon("fa-trash"), node("span", { text: t("Edit.Remove", "Remove {name}", g) })],
+          on: { click: () => start({ kind: "remove", itemId: g.itemId }) } }, s) : null
+      ].filter(Boolean);
+      const title = g.type === "class" ? `${g.name} ${g.levels}${g.subclass ? ` (${g.subclass})` : ""}` : g.name;
+      return sheetCard({ title, iconName: g.img ? node("img", { className: "ve-builder-heading-art", attrs: { src: g.img, alt: "" } }) : "fa-star",
+        className: "ve-builder-edit-group", attrs: { "data-edit-group": g.itemId, "data-edit-type": g.type }, children: [
+          rows.length ? node("div", { className: "ve-builder-cards ve-builder-list", children: rows })
+            : node("p", { className: "ve-builder-empty ve-sheet-empty", text: t("Edit.NoChoices", "Nothing to choose here.") }),
+          actions.length ? node("div", { className: "ve-builder-row ve-builder-card-actions", children: actions }) : null
+        ] });
+    };
+    setBody(
+      node("p", { className: "ve-builder-lead", text: t("Edit.Lead", "Change a choice you made at creation or on a level-up. You'll see every change before it's saved; later choices are kept where they still fit.") }),
+      sheetCard({ children: [row(rowArt(null, "fa-dumbbell"), t("Edit.Scores", "Ability scores"), t("Edit.ScoresHint", "Your base scores; increases from your level-ups and background stay on top."),
+        () => start({ kind: "scores" }), { "data-action": "edit-scores" })] }),
+      ...overview.groups.map(groupCard)
+    );
+  }
+
+  /** Replace a species, background or class: the allowed candidates, then the new item's choices. */
+  async function showReplace(group) {
+    const options = await controller.replaceOptions(group.itemId);
+    const s = frame({ screen: "edit-replace", heading: t("Edit.ReplaceHeading", "Replace {name}", group), sub: controller.actorName, back: () => showEditHome() });
+    let pick = [];
+    const go = node("button", { className: "ve-builder-primary ve-builder-wide", attrs: { type: "button", disabled: true, "data-action": "replace-start" },
+      children: [node("span", { text: t("Edit.ReplaceStart", "Use this instead") }), icon("fa-arrow-right")],
+      on: { click: () => work(async () => showView(await controller.startEdit({ kind: "replace", itemId: group.itemId, uuid: pick[0] }))) } }, s);
+    const list = choiceList(options, { scope: s, ctx: ctxFor(s), selected: [], blockerText: blockerTextFor(t), onChange: c => { pick = c; go.disabled = c.length !== 1; } });
+    setBody(
+      node("p", { className: "ve-builder-lead", text: group.type === "class"
+        ? t("Edit.ReplaceClassLead", "{name} {levels} is replaced at the same level. You choose the new class's hit points, subclass and other choices level by level.", group)
+        : t("Edit.ReplaceLead", "Everything {name} gave is removed; you choose what the new one gives.", group) }),
+      options.length ? list.element : emptyCard(t("Edit.NoOptions", "Nothing else is available in your GM's sources.")),
+      go
     );
   }
 
@@ -145,7 +214,7 @@ export function mountBuilder(host, controller, { t, onClose = () => {} }) {
     frame({ screen: "history", heading: t("History", "Change history"), back: () => showHome() });
     const fmt = new Intl.DateTimeFormat(globalThis.game?.i18n?.lang, { dateStyle: "medium", timeStyle: "short" });
     setBody(...(entries.length ? entries.map(entry => node("details", { className: "ve-builder-history ve-sheet-card", children: [
-      node("summary", { children: [icon("fa-chevron-right"), node("span", { children: [node("strong", { text: `${entry.before.label} → ${entry.after.label}` }),
+      node("summary", { children: [icon("fa-chevron-right"), node("span", { children: [node("strong", { text: entry.label || `${entry.before.label} → ${entry.after.label}` }),
         node("small", { text: `${fmt.format(new Date(entry.date))} · ${entry.user.name}` })] })] }),
       node("div", { className: "ve-builder-history-groups", children: historyGroups(entry) })
     ] })) : [emptyCard(t("NoHistory", "No level-ups have been committed from Mobile Deck yet."))]));

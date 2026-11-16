@@ -172,8 +172,10 @@ function bigChoiceContent(iconName, title, hint, on) {
 export const STEP_SCREENS = {
   HitPoints(model, ctx, scope) {
     const locked = ctx.controller.lockedRoll(model);
+    // Change choices: the roll this level already has is kept (never rolled again); average stays open.
+    const kept = !locked && model.meta?.hp?.seeded && model.meta.hp.method === "roll" && Number.isFinite(Number(model.meta.hp.roll)) ? Number(model.meta.hp.roll) : null;
     let method = model.meta?.hp?.method ?? (locked ? "roll" : "");
-    let roll = locked?.value ?? null;
+    let roll = locked?.value ?? kept;
     const total = node("p", { className: "ve-builder-hp-total" });
     const rollButton = node("button", { className: "ve-builder-big-choice ve-sheet-item-row", attrs: { type: "button" }, on: { click: async () => {
       if (roll === null) {
@@ -187,10 +189,10 @@ export const STEP_SCREENS = {
     const avgButton = node("button", { className: "ve-builder-big-choice ve-sheet-item-row", attrs: { type: "button" }, on: { click: () => { method = "avg"; refresh(); } } }, scope);
     const refresh = () => {
       rollButton.replaceChildren(...bigChoiceContent("fa-dice-d20", roll === null ? ctx.t("HP.Roll", "Roll d{die}", { die: model.die }) : ctx.t("HP.Rolled", "Rolled {roll}", { roll }),
-        roll === null ? ctx.t("HP.RollHint", "The roll goes to chat and is locked in") : ctx.t("HP.Locked", "Locked in"), method === "roll"));
+        roll === null ? ctx.t("HP.RollHint", "The roll goes to chat and is locked in") : kept !== null ? ctx.t("HP.Kept", "Your roll for this level") : ctx.t("HP.Locked", "Locked in"), method === "roll"));
       avgButton.replaceChildren(...bigChoiceContent("fa-scale-balanced", ctx.t("HP.Average", "Take average ({avg})", { avg: model.average }),
-        roll !== null ? ctx.t("HP.AverageLocked", "Not available after rolling") : ctx.t("HP.AverageHint", "The safe choice"), method === "avg"));
-      avgButton.disabled = roll !== null;
+        roll !== null && kept === null ? ctx.t("HP.AverageLocked", "Not available after rolling") : ctx.t("HP.AverageHint", "The safe choice"), method === "avg"));
+      avgButton.disabled = roll !== null && kept === null;
       rollButton.classList.toggle("is-selected", method === "roll");
       avgButton.classList.toggle("is-selected", method === "avg");
       const base = method === "roll" ? roll : method === "avg" ? model.average : null;
@@ -205,7 +207,7 @@ export const STEP_SCREENS = {
         children: [node("div", { className: "ve-builder-cards ve-builder-list", children: [rollButton, avgButton] }), total] }),
       answer: () => ({ data: { value: method === "roll" ? roll : "avg" },
         meta: { hp: { method, roll: method === "roll" ? roll : model.average, die: model.die, mod: model.mod, modLabel: model.modLabel,
-          classIdentifier: model.classIdentifier, level: model.level } } })
+          classIdentifier: model.classIdentifier, level: model.level, ...(method === "roll" && kept !== null && roll === kept ? { seeded: true } : {}) } } })
     };
   },
 

@@ -170,3 +170,18 @@ test("hpFromAnswer: the HP review detail follows the applied data.value, not the
   assert.equal(hpFromAnswer({ data: {} }, 8), null);
   assert.equal(hpFromAnswer(null, 8), null);
 });
+
+test("change log: an edit's label is kept and becomes its title; level-ups fall back to before → after", () => {
+  const user = { id: "p", name: "Ann" };
+  const edit = buildChangeLogEntry({ kind: "edit", user, date: 1, label: "Human → Dwarf",
+    before: { level: 4, label: "Fighter 4" }, after: { level: 4, label: "Fighter 4" }, groups: [] });
+  assert.equal(edit.kind, "edit");
+  assert.equal(edit.label, "Human → Dwarf");
+  assert.equal(changeLogTitle(edit), "Human → Dwarf", "not \"Fighter 4 → Fighter 4\"");
+  const plain = buildChangeLogEntry({ kind: "level-up", user, date: 1, before: { level: 3, label: "Fighter 3" }, after: { level: 4, label: "Fighter 4" }, groups: [] });
+  assert.equal("label" in plain, false, "no empty label key on a level-up");
+  assert.equal(changeLogTitle(plain), "Fighter 3 → Fighter 4");
+  assert.equal(changeLogTitle(buildChangeLogEntry({ kind: "creation", user, date: 1, before: {}, after: { level: 1, label: "Fighter 1" }, groups: [] })), "Fighter 1");
+  assert.equal(changeLogTitle(buildChangeLogEntry({ kind: "edit", user, date: 1, before: {}, after: {}, groups: [] })), "edit", "nothing to show: the kind");
+  assert.equal(buildChangeLogEntry({ kind: "edit", user, date: 1, label: 42, before: {}, after: {}, groups: [] }).label, "42", "stored as a string");
+});

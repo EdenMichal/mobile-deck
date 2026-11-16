@@ -190,3 +190,20 @@ test("serverNow: Foundry's server clock (game.time.serverTime), else this device
   assert.ok(local >= before && local <= Date.now());
   assert.ok(Number.isFinite(serverNow({ time: { serverTime: NaN } })));
 });
+
+test("collectSubmissions: a draft whose target is an edit kind is flagged edit; level-ups aren't", () => {
+  const users = [{ id: "p1", name: "Ann", isGM: false, builder: { drafts: {
+    a1: { status: "submitted", submittedAt: 10, label: "Fighter 3 → 4", target: { kind: "level", classId: "c1" } },
+    a2: { status: "submitted", submittedAt: 20, label: "Human → Dwarf", target: { kind: "replace", itemId: "r1", uuid: "Compendium.x.y.Item.z" } },
+    a3: { status: "submitted", submittedAt: 30, label: "Ability scores", target: { kind: "scores" } },
+    a4: { status: "submitted", submittedAt: 40, label: "Fighter 3", target: { kind: "modify", itemId: "c1", level: 3 } },
+    a5: { status: "approving", submittedAt: 50, label: "Remove Rogue", target: { kind: "remove", itemId: "c2" } },
+    a6: { status: "submitted", submittedAt: 60, label: "Wizard 1 → 2" }
+  } } }];
+  const list = collectSubmissions(users);
+  assert.deepEqual(list.map(s => [s.actorId, s.kind, s.edit ?? false]), [
+    ["a1", "level-up", false], ["a2", "level-up", true], ["a3", "level-up", true],
+    ["a4", "level-up", true], ["a5", "level-up", true], ["a6", "level-up", false]
+  ], "edits ride the level-up slot and relay; only the flag tells them apart");
+  assert.equal("edit" in list[0], false, "no edit key at all on a plain level-up");
+});

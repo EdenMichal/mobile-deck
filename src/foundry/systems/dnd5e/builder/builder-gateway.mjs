@@ -12,7 +12,6 @@ import { createDraftStore } from "./draft-store.mjs";
 import { multiclassBlockers } from "./asi-math.mjs";
 import { builderSnapshot, classSummary } from "./snapshot.mjs";
 import { itemDetails, stepModel } from "./step-model.mjs";
-import { builderSpellSteps } from "./feature-spells.mjs";
 import { spellDetails } from "./spell-details.mjs";
 import { mountBuilder } from "../../../../features/builder/builder-layer.mjs";
 import { createCreationController } from "./creation-controller.mjs";
@@ -25,6 +24,7 @@ import { approvalResult, asApproving, asDraft, asRejected, asSubmitted, asUnclai
   resultKey, sameSubmission, serverNow, statusOf, submissionId } from "./approval-rules.mjs";
 import { CLAIM_SETTLE_MS } from "./creation-controller.mjs";
 import { startApprovalWatcher } from "./approval-watcher.mjs";
+import { editLabel, editNotes, editOverview, isEditTarget, replaceOptions, sessionOptions } from "./edit-character.mjs"; // Change choices (D&D Beyond-style edits)
 
 export function t(key, fallback, data = {}) {
   const full = `VEMOBILE.Builder.${key}`;
@@ -53,7 +53,12 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
   };
   const maxLevel = () => Number(globalThis.CONFIG.DND5E.maxLevel) || 20;
   const abilityValues = () => Object.fromEntries(Object.entries(actor.system.abilities).map(([k, a]) => [k, Number(a.value) || 0]));
+  // An edit's label, worked out from the actor on the client that builds the session (never the draft's own text, which
+  // a player could write: the GM's popup and the change log show this one).
+  let editHeading = null;
+  const setEditHeading = async target => { editHeading = isEditTarget(target) ? await editLabel(actor, target, t) : null; };
   const classTargetLabel = target => {
+    if (isEditTarget(target)) return editHeading ?? t("Edit.Heading", "Change choices");
     if (target.kind === "level") {
       const cls = actor.items.get(target.classId);
       return cls ? `${cls.name} ${cls.system.levels} → ${cls.system.levels + 1}` : "";
@@ -84,15 +89,25 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
     return problems.map((text, i) => ({ key: `multiclass:${i}`, text: t("Multiclass.Override", "GM override: {text}", { text }) }));
   }
 
+  /** Is `value` the HP the actor already has for that class level (an edit keeping an earlier roll)? */
+  const keptHp = (step, value) => {
+    const cls = actor.items.find(i => i.type === "class" && i.identifier === step.classIdentifier);
+    const hp = cls ? Object.values(cls.advancement?.byId ?? {}).find(a => a.constructor.typeName === "HitPoints") : null;
+    return Boolean(hp) && hp.value?.[step.level] !== undefined && hp.value[step.level] === value;
+  };
+  const kindOf = target => (isEditTarget(target) ? "edit" : "level-up");
+  /** Review notes for the session's target: an edit's (what it leaves alone), or a new class's multiclass overrides. */
+  const targetNotes = (target, options) => (isEditTarget(target) ? editNotes(actor, target, t) : multiclassNotes(target, options));
+
   async function view() {
     if (session.pending) {
       const model = await stepModel(session);
-      return { screen: "step", model, canBack: session.pending.index > 0, error: session.error?.message ?? "",
+      return { screen: "step", model, kind: kindOf(session.target), canBack: session.pending.index > 0, error: session.error?.message ?? "",
         heading: classTargetLabel(session.target), steps: session.path.length };
     }
     const { before, after, groups } = sessionReview(session, t);
     const draft = stored();
-    return { screen: "review", groups, from: classSummary(before), to: classSummary(after), canBack: session.answers.length > 0,
+    return { screen: "review", kind: kindOf(session.target), groups, from: classSummary(before), to: classSummary(after), canBack: session.answers.length > 0,
       heading: classTargetLabel(session.target), mode: mode(), status: statusOf(draft), rejectReason: draft?.rejectReason ?? "",
       rejectedBy: draft?.rejectedBy?.name ?? "", gmOnline: Boolean(globalThis.game.users.activeGM) };
   }
@@ -118,7 +133,8 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
       const rules = currentHouseRules();
       return { name: actor.name, img: actor.img, level, classes, atMax: level >= maxLevel(),
         canAddClass: !classes.length || rules.multiclass,
-        draft: draft ? { label: draft.label ?? "", answers: draft.answers?.length ?? 0, status: statusOf(draft), rejectReason: draft.rejectReason ?? "" } : null,
+        draft: draft ? { label: draft.label ?? "", answers: draft.answers?.length ?? 0, status: statusOf(draft), rejectReason: draft.rejectReason ?? "",
+          edit: isEditTarget(draft.target) } : null,
         locked: isWaiting(draft),
         isGM: Boolean(game.user.isGM) };
     },
@@ -137,8 +153,9 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
     async start(target) {
       assertEditable();
       // Fix 12: the multiclassing rules are the engine's, not only the class list's: a player is refused, a GM is warned.
-      const notes = await multiclassNotes(target);
-      session = createLevelUpSession(actor, target, [], { remapUuid: preferredUuid, extraSteps: builderSpellSteps });
+      const notes = await targetNotes(target);
+      await setEditHeading(target);
+      session = createLevelUpSession(actor, target, [], sessionOptions(target, actor, t));
       session.controllerNotes = notes;
       await session.start();
       await saveDraft();
@@ -148,8 +165,9 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
       const draft = drafts.draft(actor.id);
       if (!draft) return null;
       loaded = draft;
-      session = createLevelUpSession(actor, draft.target, draft.answers ?? [], { remapUuid: preferredUuid, extraSteps: builderSpellSteps });
-      session.controllerNotes = await multiclassNotes(draft.target, { refuse: false });
+      await setEditHeading(draft.target);
+      session = createLevelUpSession(actor, draft.target, draft.answers ?? [], sessionOptions(draft.target, actor, t));
+      session.controllerNotes = await targetNotes(draft.target, { refuse: false });
       await session.resume();
       return view();
     },
@@ -164,7 +182,7 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
     },
     async commit() {
       if (mode() === "submit") throw new Error(t("Approval.SubmitInstead", "This level-up needs your GM's approval: submit it instead."));
-      const entry = await commitSession(session, { moduleId, t });
+      const entry = await commitSession(session, { moduleId, t, kind: kindOf(session.target), label: isEditTarget(session.target) ? classTargetLabel(session.target) : "" });
       await drafts.finish(actor.id);
       session = null;
       return entry;
@@ -195,7 +213,8 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
      * step itself (class, level, die); and this actor's locks on the player's flag. The GM's client checks them.
      */
     hpRolls: () => ({
-      steps: (session?.path ?? []).filter(p => p.type === "HitPoints" && session.answers[p.index]?.key === p.key)
+      // Edits: a roll the character already has (kept, not rolled again) isn't a new roll to check.
+      steps: (session?.path ?? []).filter(p => p.type === "HitPoints" && session.answers[p.index]?.key === p.key && !keptHp(p, session.answers[p.index].data?.value))
         .map(p => ({ value: session.answers[p.index].data?.value, key: `${actor.id}|${p.classIdentifier}|${p.level}`, die: p.die })),
       locks: drafts.locksFor(actor.id) }),
     /** The replayed steps and their answers (the GM's client checks ItemGrant / ItemChoice picks against what each offered). */
@@ -230,13 +249,14 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
         entry = committed();
         if (!entry) {
           // The review the popup showed may be older than the actor: replay the reviewed answers on the actor as it is now.
-          session = createLevelUpSession(actor, loaded.target, loaded.answers ?? [], { remapUuid: preferredUuid, extraSteps: builderSpellSteps });
+          await setEditHeading(loaded.target);
+          session = createLevelUpSession(actor, loaded.target, loaded.answers ?? [], sessionOptions(loaded.target, actor, t));
           await session.resume();
           if (session.pending) throw new Error(t("Approval.IncompleteNow", "This level-up no longer replays to the end on {name} (it stops at “{step}”). Send it back.",
             { name: actor.name, step: session.pending.title ?? "" }));
           assertClaim();
           // Looked up again after the replay and the last claim check: the latest moment before the commit.
-          entry = committed() ?? await commitSession(session, { moduleId, t, author: user, approvedBy: { id: by.id, name: by.name }, approvalOf });
+          entry = committed() ?? await commitSession(session, { moduleId, t, kind: kindOf(loaded.target), label: isEditTarget(loaded.target) ? classTargetLabel(loaded.target) : "", author: user, approvedBy: { id: by.id, name: by.name }, approvalOf });
         }
       } catch (error) {
         if (error?.partial) {
@@ -257,6 +277,15 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
       return entry;
     },
     history() { return actor.getFlag(moduleId, "changeLog") ?? []; },
+    /** Change choices (D&D Beyond-style edits): the overview of what can be changed, by item and level. */
+    editOverview: () => editOverview(actor),
+    /** Candidates to replace an item (species, background, class) with. */
+    replaceOptions: itemId => replaceOptions(actor, itemId),
+    /** Start an edit: { kind: "modify", itemId, level } | { kind: "replace", itemId, uuid } | { kind: "remove", itemId } | { kind: "scores" }. */
+    async startEdit(target) {
+      if (!isEditTarget(target)) throw new Error("Not an edit.");
+      return this.start(target);
+    },
     details: uuid => itemDetails(uuid),
     /** The current screen again (the spell step's Retry). */
     current: () => view(),
@@ -268,6 +297,7 @@ export function createBuilderController(actor, { moduleId = MODULE_ID, user = gl
       // dnd5e's own window saves directly, so in approval mode it would bypass the GM.
       if (mode() === "submit") throw new Error(t("Approval.NativeNeedsGm", "This step needs dnd5e's own window, which saves without approval. Ask your GM to finish this level-up."));
       const target = session?.target;
+      if (isEditTarget(target)) throw new Error(t("Edit.NoNative", "This choice can't be changed on a phone. Ask your GM to change it on the desktop sheet."));
       session = null;
       await drafts.clearDraft(actor.id);
       if (target?.kind === "level") {

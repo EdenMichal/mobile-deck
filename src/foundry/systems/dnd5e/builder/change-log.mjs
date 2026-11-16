@@ -9,7 +9,7 @@ export const UNDO_KEEP = 3;
 
 /**
  * @param {object} data
- * @param {"level-up"|"creation"|"fix-level"} data.kind
+ * @param {"level-up"|"creation"|"edit"} data.kind  "edit": a change of earlier choices (Change choices, spec 2026-11-16).
  * @param {{ id: string, name: string }} data.user
  * @param {{ id: string, name: string }|null} [data.approvedBy]  The GM who approved a player's submission (Phase 4b).
  * @param {number} data.date                 Milliseconds since epoch.
@@ -18,8 +18,9 @@ export const UNDO_KEEP = 3;
  * @param {Array} data.groups                Output of reviewChanges().
  * @param {object} [data.undo]               { createdItemIds, deletedItems, actorSystem }.
  * @param {string} [data.approvalOf]         Phase 4b: the submission this entry approved (approval-rules submissionId).
+ * @param {string} [data.label]              Edits: what was changed (the edit's label).
  */
-export function buildChangeLogEntry({ kind, user, approvedBy = null, date, before, after, groups, undo = null, approvalOf = null }) {
+export function buildChangeLogEntry({ kind, user, approvedBy = null, date, before, after, groups, undo = null, approvalOf = null, label = "" }) {
   return {
     id: `${date.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     kind,
@@ -30,7 +31,9 @@ export function buildChangeLogEntry({ kind, user, approvedBy = null, date, befor
     after: { level: Number(after?.level) || 0, label: String(after?.label ?? "") },
     groups: (groups ?? []).map(g => ({ id: g.id, title: g.title, lines: g.lines.map(l => ({ text: l.text, kind: l.kind })) })),
     undo: undo ?? null,
-    ...(approvalOf ? { approvalOf: String(approvalOf) } : {})
+    ...(approvalOf ? { approvalOf: String(approvalOf) } : {}),
+    // Edits: what was changed ("Human → Dwarf", "Ability scores"); the class summary often stays the same.
+    ...(label ? { label: String(label) } : {})
   };
 }
 
@@ -42,6 +45,7 @@ export function appendChangeLog(existing, entry, { limit = CHANGE_LOG_LIMIT, und
 
 /** Short one-line summary, e.g. "Fighter 3 → Fighter 4 (Champion)". */
 export function changeLogTitle(entry) {
+  if (entry.label) return entry.label;
   if (entry.before?.label && entry.after?.label) return `${entry.before.label} → ${entry.after.label}`;
   return entry.after?.label || entry.kind;
 }

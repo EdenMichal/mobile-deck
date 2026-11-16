@@ -13,6 +13,7 @@ import { createTraitLists, unfulfilledChoices } from "./trait-choices.mjs";
 import { isLanguagePool } from "./trait-options.mjs";
 import { currentHouseRules } from "./content-sources.mjs";
 import { asiAnswerProblems } from "./asi-math.mjs";
+import { isEditTarget, pairRecreatedItems, seedsFor, swapIds } from "./edit-rules.mjs";
 
 /** Advancement types the mobile screens can draw. Others fall back to dnd5e's window. */
 export const SUPPORTED_TYPES = new Set(["HitPoints", "AbilityScoreImprovement", "Subclass", "ItemChoice", "ItemGrant", "Trait", "Size", "ScaleValue"]);
@@ -21,9 +22,27 @@ const managerClass = () => globalThis.dnd5e.applications.advancement.Advancement
 
 /** Stable identity of a step across replays (item ids of granted items change every replay). */
 export function stepKey(flow) {
-  const item = flow.item ?? flow.advancement.item;
-  const source = item._stats?.compendiumSource ?? item.flags?.dnd5e?.sourceId ?? item.identifier ?? item.name;
-  return `${source}|${flow.advancement.id}|${flow.level}`;
+  return keyOf(flow.item ?? flow.advancement.item, flow.advancement.id, flow.level);
+}
+
+const itemSource = item => item._stats?.compendiumSource ?? item.flags?.dnd5e?.sourceId ?? item.identifier ?? item.name;
+const keyOf = (item, advancementId, level) => `${itemSource(item)}|${advancementId}|${level}`;
+
+/**
+ * Edits (spec 2026-11-16): every pick on the actor as a replayable answer, by step key: Map(key → { data, meta }).
+ * A step on the level being changed shows its seed preselected; any other step dnd5e asks again (a subclass re-added,
+ * species choices reversed with a class) applies its seed without asking.
+ */
+export function seedAnswers(actor) {
+  const seeds = new Map();
+  for (const item of actor?.items ?? []) {
+    for (const adv of item.advancement?.byId ? Object.values(item.advancement.byId) : []) {
+      for (const seed of seedsFor(adv.constructor.typeName, adv.value, adv.levels ?? [])) {
+        seeds.set(keyOf(item, adv.id, seed.level), { data: seed.data, meta: seed.meta });
+      }
+    }
+  }
+  return seeds;
 }
 
 /**
@@ -217,6 +236,15 @@ export function missingName(uuid) {
  *     `pending.conflicts`; with skipUnanswered the answer is applied as saved and listed in `session.conflicts`.
  */
 export function createLevelUpSession(actor, target, answers = [], { remapUuid = null, extraSteps = null, skipTypes = null, skipUnanswered = false, checkAnswer = null, prepareItem = null } = {}) {
+  // Edits: the actor's current picks (read once; the real actor doesn't change until commit).
+  const seeds = isEditTarget(target) ? seedAnswers(actor) : null;
+  /** The steps the player asked to change (modify: the item's forward steps at that level); others replay their seed. */
+  const isFocus = step => target.kind !== "modify" || (!step.synthetic && step.type === "forward"
+    && (step.flow?.item ?? step.flow?.advancement?.item)?.id === target.itemId && Number(step.flow?.level) === Number(target.level));
+  const seedOf = key => {
+    const seed = seeds?.get(key);
+    return seed ? { key, data: structuredClone(seed.data), meta: seed.meta ? structuredClone(seed.meta) : null } : null;
+  };
   const session = {
     actor, target,
     answers: answers.map(a => (a ? { key: a.key, data: a.data, meta: a.meta } : null)),
@@ -244,6 +272,17 @@ export function createLevelUpSession(actor, target, answers = [], { remapUuid = 
   async function buildManager() {
     const AM = managerClass();
     if (target.kind === "level") return AM.forLevelChange(actor, target.classId, 1);
+    if (target.kind === "modify") {
+      if (!actor.items.get(target.itemId)) throw new Error(`Item not found: ${target.itemId}`);
+      return AM.forModifyChoices(actor, target.itemId, Number(target.level) || 0);
+    }
+    if (target.kind === "remove") {
+      if (!actor.items.get(target.itemId)) throw new Error(`Item not found: ${target.itemId}`);
+      return removeManager(AM, actor, target.itemId);
+    }
+    if (target.kind === "replace") return replaceManager(AM, actor, target, prepareItem);
+    // Base ability scores: no dnd5e steps, only the builder's own (extraSteps).
+    if (target.kind === "scores") return new AM(actor);
     if (target.kind === "new-item") {
       const item = await fromUuid(target.uuid);
       if (!item) throw new Error(`Item not found: ${target.uuid}`);
@@ -283,8 +322,28 @@ export function createLevelUpSession(actor, target, answers = [], { remapUuid = 
       }
       const pre = new Map(manager.clone.items.map(item => [item.id, item]));
 
-      if (step.type === "delete" && step.item) manager.clone.items.delete(step.item.id);
-      else if (step.type === "reverse" && flow) await flow.advancement.reverse(flow.level);
+      // A restore dnd5e refuses (edits: a later level's pick that no longer fits) is asked like a forward step, as in dnd5e.
+      let type = step.type;
+      if (type === "restore" && flow) {
+        try { await flow.advancement.restore(flow.level, flow.retainedData); }
+        catch (error) {
+          console.warn("Character Builder | restore refused, asking again", flow.advancement.title, error);
+          type = "forward";
+        }
+      }
+      if (type === "restore") { /* restored above */ }
+      else if (type === "delete" && step.item) {
+        // As dnd5e's #forward: an item a grant gave is kept for that grant's restore.
+        const retained = flow?.retainedData?.retainedItems;
+        if (retained) retained[step.item.flags?.dnd5e?.sourceId] = step.item.toObject();
+        manager.clone.items.delete(step.item.id);
+      }
+      else if (type === "reverse" && flow) {
+        // Kept for a later restore step of the same flow (edits: forModifyChoices restores the levels above).
+        const data = await flow.advancement.reverse(flow.level);
+        if (typeof flow.retainData === "function") await flow.retainData(data);
+        else flow.retainedData = data;
+      }
       else if (flow && skipTypes?.has(flow.advancement.constructor.typeName)) {
         // Never asked, never applied (Phase 4: a species' ability increases; types with no screen).
         session.skipped.push({ title: flow.advancement.title, type: flow.advancement.constructor.typeName });
@@ -299,13 +358,19 @@ export function createLevelUpSession(actor, target, answers = [], { remapUuid = 
               ...stepFacts(adv) };
             path.push(entry);
             alignAnswers(session.answers, answerIndex, key);
+            // Edits: a step the player didn't ask to change replays its current pick (asked only if dnd5e refuses it).
+            if (seeds && !session.answers[answerIndex] && answerIndex < stopAt && !isFocus(step)) {
+              const seed = seedOf(key);
+              if (seed) session.answers[answerIndex] = { ...seed, meta: { ...(seed.meta ?? {}), seeded: true } };
+            }
             if (skipUnanswered && answerIndex < stopAt && !session.answers[answerIndex]) {
               // Free tabs: leave this step unapplied and keep going; its tab shows "needs attention".
               session.missing.push(entry);
             } else if (answerIndex >= stopAt || !session.answers[answerIndex]) {
               session.manager = manager;
               session.path = path;
-              session.pending = { ...entry, stepIndex: i, totalSteps: steps.length, flow, advancement: adv, answer: session.answers[answerIndex] ?? null };
+              session.pending = { ...entry, stepIndex: i, totalSteps: steps.length, flow, advancement: adv,
+                answer: session.answers[answerIndex] ?? seedOf(key) };
               return session;
             } else {
               const check = checkAnswer ? await checkAnswer(adv, flow.level, session.answers[answerIndex].data) : null;
@@ -412,6 +477,86 @@ export function createLevelUpSession(actor, target, answers = [], { remapUuid = 
   // Holes (steps not answered yet) stay as null, so answer indexes keep matching the path.
   session.draft = () => ({ target, answers: session.answers.map(a => (a ? { key: a.key, data: a.data, meta: a.meta ?? null } : null)) });
   return session;
+}
+
+/**
+ * Edits: dnd5e's forDeletedItem, which for an item without advancement has no steps at all; the item still goes.
+ */
+function removeManager(AM, actor, itemId) {
+  const manager = AM.forDeletedItem(actor, itemId);
+  if (!manager.steps.some(s => s.type === "delete")) manager.steps.push({ type: "delete", item: manager.clone.items.get(itemId), automatic: true });
+  return manager;
+}
+
+/**
+ * Edits: replace the species, background (or another non-class item) or a class with `target.uuid`, on one manager:
+ * dnd5e's forDeletedItem for the old item, then forward steps for the new one (as forNewItem, or for a class as
+ * createLevelChangeSteps, at the character levels the old class had). The new item takes over the old one's link
+ * (details.race / details.background / details.originalClass).
+ */
+async function replaceManager(AM, actor, target, prepareItem) {
+  const old = actor.items.get(target.itemId);
+  if (!old) throw new Error(`Item not found: ${target.itemId}`);
+  const doc = await fromUuid(target.uuid);
+  if (!doc) throw new Error(`Item not found: ${target.uuid}`);
+  if (doc.type !== old.type) throw new Error(`${doc.name} isn't a ${old.type}.`);
+  const data = game.items.fromCompendium(doc);
+  if (prepareItem) await prepareItem(data, doc);
+  const manager = removeManager(AM, actor, target.itemId);
+  const clone = manager.clone;
+  const id = foundry.utils.randomID();
+  const itemData = foundry.utils.deepClone(data);
+  itemData._id = id;
+  const links = {};
+  if (old.type === "class") {
+    itemData.system.levels = 0;
+    if (clone.system.details.originalClass === old.id) links["system.details.originalClass"] = id;
+  }
+  if (old.type === "race" || clone._source.system?.details?.race === old.id) links["system.details.race"] = id;
+  if (old.type === "background" || clone._source.system?.details?.background === old.id) links["system.details.background"] = id;
+  clone.updateSource({ items: [itemData], ...links });
+  clone.reset();
+  const item = clone.items.get(id);
+  const characterLevel = Number(actor.system.details.level) || 0;
+
+  if (old.type !== "class") {
+    Array.fromRange(AM.currentLevel(item, clone) + 1).flatMap(l => AM.flowsForLevel(item, l))
+      .forEach(flow => manager.steps.push({ type: "forward", flow }));
+    if (characterLevel > 0) manager.steps.push({ type: "forward", automatic: true, level: characterLevel });
+    return manager;
+  }
+
+  // A class: its levels again, at the character levels the old class leaves free (dnd5e's createLevelChangeSteps
+  // counts from the actor's level, which is the old class's top level here).
+  const levels = Number(old.system.levels) || 1;
+  const below = characterLevel - levels;
+  const race = clone.items.find(i => i.type === "race") ?? null;
+  // Items whose advancement the old class (or its subclass) gave go with it; their steps aren't replayed here.
+  const gone = new Set([old.id, old.subclass?.id].filter(Boolean));
+  // dnd5e 5.3 keeps where an item came from in its flags: advancementRoot (the top item, so nested grants count too),
+  // else advancementOrigin ("<itemId>.<advancementId>").
+  const fromOld = i => {
+    const flags = i.flags?.dnd5e ?? {};
+    return gone.has(String(flags.advancementRoot ?? flags.advancementOrigin ?? "").split(".")[0]);
+  };
+  const otherFlows = (charLevel, classLevel) => clone.items.contents.flatMap(i => {
+    if (["class", "subclass", "race"].includes(i.type) || gone.has(i.id) || fromOld(i)) return [];
+    if (["class", "subclass"].includes(i.system.advancementRootItem?.type) && i.system.advancementClassLinked) {
+      const root = i.system.advancementRootItem.class ?? i.system.advancementRootItem;
+      return root === item ? AM.flowsForLevel(i, classLevel) : [];
+    }
+    return AM.flowsForLevel(i, charLevel);
+  });
+  for (let classLevel = 1; classLevel <= levels; classLevel++) {
+    const charLevel = below + classLevel;
+    const stepData = { type: "forward", class: { item, level: classLevel }, level: charLevel };
+    const push = flows => manager.steps.push(...flows.map(flow => ({ flow, ...stepData })));
+    push(race ? AM.flowsForLevel(race, charLevel) : []);
+    push(AM.flowsForLevel(item, classLevel));
+    push(otherFlows(charLevel, classLevel));
+  }
+  manager.steps.push({ type: "forward", automatic: true, class: { item, level: levels }, level: characterLevel });
+  return manager;
 }
 
 /** Fix 12: refuse ASI points dnd5e would lose (a score at its maximum) or that break the step's limits. */
@@ -525,5 +670,17 @@ export function cloneDiff(manager) {
     else { obj.toUpdate.push(item); obj.toDelete.findSplice(id => id === item._id); }
     return obj;
   }, { toCreate: [], toUpdate: [], toDelete: manager.actor.items.map(i => i.id) });
-  return { updates, toCreate, toUpdate, toDelete };
+  // Edits: items dnd5e re-created with a fresh id are written back onto the item they replace (same id, uses kept).
+  const deleted = toDelete.map(id => manager.actor.items.get(id)?.toObject()).filter(Boolean);
+  const map = pairRecreatedItems(toCreate, deleted);
+  if (!map.size) return { updates, toCreate, toUpdate, toDelete };
+  const swapped = swapIds({ updates, toCreate, toUpdate }, map);
+  const kept = new Set(map.values());
+  const paired = swapped.toCreate.filter(i => kept.has(i._id)).map(item => {
+    const spent = deleted.find(d => d._id === item._id)?.system?.uses?.spent;
+    if (spent !== undefined && item.system?.uses) item.system.uses.spent = spent;
+    return item;
+  });
+  return { updates: swapped.updates, toCreate: swapped.toCreate.filter(i => !kept.has(i._id)), toUpdate: [...swapped.toUpdate, ...paired],
+    toDelete: toDelete.filter(id => !kept.has(id)) };
 }

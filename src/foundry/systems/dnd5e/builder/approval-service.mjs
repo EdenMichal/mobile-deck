@@ -15,6 +15,8 @@ import { multiclassBlockers } from "./asi-math.mjs";
 import { esc } from "./commit.mjs";
 import { asRejected, checkGoldRolls, checkHpRolls, checkLevelUpTarget, checkRollCount, checkRolledSets, claimedElsewhere, collectSubmissions, pageId,
   sameSubmission, serverNow, submissionId } from "./approval-rules.mjs";
+import { checkEditTarget, isEditTarget, scoresAnswerProblem } from "./edit-rules.mjs";
+import { methodsAllowed } from "./creation-rules.mjs";
 
 /** The document type each creation tab picks, and its tab label. */
 const PICK_TYPES = Object.freeze({ class: ["class", "Tab.Class", "Class"], background: ["background", "Tab.Background", "Background"], species: ["race", "Tab.Species", "Species"] });
@@ -106,9 +108,29 @@ export function createApprovalService({ moduleId, t, game = globalThis.game, lev
     return warnings;
   }
 
+  /** Change choices (spec 2026-11-16): the edit the player wrote, on the actor as it is now. */
+  async function editTargetChecks(actor, target, user, rules) {
+    const doc = target.kind === "replace" ? await globalThis.fromUuid(String(target.uuid ?? "")).catch(() => null) : null;
+    const items = actor.items.map(i => ({ id: i.id, type: i.type, identifier: i.identifier ?? i.system?.identifier ?? "" }));
+    const key = checkEditTarget(target, { items, originalClass: actor.system.details.originalClass ?? "", doc, rules });
+    const TEXT = {
+      kind: ["Approval.TargetKind", "This request isn't a level-up Mobile Deck makes."],
+      item: ["Approval.EditItem", "{name} no longer has what this change is for."],
+      level: ["Approval.EditItem", "{name} no longer has what this change is for."],
+      remove: ["Approval.EditRemove", "{name} can't drop that class."],
+      notSame: ["Approval.EditNotSame", "The replacement can't be found."],
+      banned: ["Approval.TargetBanned", "{class} is banned in the House Rules."],
+      owned: ["Approval.TargetOwned", "{name} already has {class}."]
+    };
+    if (key) return { blockers: [line(t(TEXT[key][0], TEXT[key][1], { name: actor.name, class: doc?.name ?? "" }))], warnings: [] };
+    if (doc && !visibleTo(doc, user)) return { blockers: [line(t("Approval.PickHidden", "{tab}: {player} can't see {name}.", { tab: t("Edit.Heading", "Change choices"), player: user.name, name: doc.name }))], warnings: [] };
+    return { blockers: [], warnings: [] };
+  }
+
   /** The level-up target the player wrote: blockers, and multiclass prerequisites as a warning (spec: the GM may allow it). */
   async function targetChecks(actor, target, user) {
     const rules = currentHouseRules(game);
+    if (isEditTarget(target)) return editTargetChecks(actor, target, user, rules);
     const classes = Object.values(actor.classes ?? {});
     const doc = target?.kind === "new-class" ? await globalThis.fromUuid(String(target.classUuid ?? "")).catch(() => null) : null;
     const key = checkLevelUpTarget(target, { classIds: classes.map(c => c.id), identifiers: classes.map(c => c.identifier),
@@ -191,8 +213,18 @@ export function createApprovalService({ moduleId, t, game = globalThis.game, lev
       warnings.push(checked(t("Approval.HpCheck", "Hit point roll {value}: {problem}", { value: p.value, problem: problem(p.problem) })));
     }
     warnings.push(...(await offListPicks(controller.sessions())));
-    return { ...model, controller, subtitle: `${view.from} → ${view.to}`, groups: view.groups,
-      lead: t("Approval.LevelUpLead", "{player} submitted a level-up for {name}. Approve applies it on your client.", { player: user.name, name: actor.name }),
+    if (stored.target?.kind === "scores") {
+      // The step offers the House Rules' methods to a player; the draft is theirs to write, so the GM is told how it was made.
+      const answer = (stored.answers ?? []).find(a => a?.key === "edit:scores")?.data;
+      const problem = scoresAnswerProblem(answer, methodsAllowed(currentHouseRules(game)));
+      if (problem === "method") warnings.push(checked(t("Approval.ScoresMethod", "Ability scores: made with a method the House Rules don't allow.")));
+      if (problem === "entered") warnings.push(checked(t("Approval.ScoresEntered", "Ability scores: typed in, not rolled (rolls aren't kept, so check the numbers).")));
+    }
+    const edit = view.kind === "edit";
+    if (edit) model.title = t("Approval.EditTitle", "{player}: change {name}", { player: user.name, name: actor.name });
+    return { ...model, controller, subtitle: edit ? view.heading : `${view.from} → ${view.to}`, groups: view.groups,
+      lead: edit ? t("Approval.EditLead", "{player} changed earlier choices of {name}: {label}. Approve applies it on your client.", { player: user.name, name: actor.name, label: view.heading })
+        : t("Approval.LevelUpLead", "{player} submitted a level-up for {name}. Approve applies it on your client.", { player: user.name, name: actor.name }),
       warnings };
   }
 

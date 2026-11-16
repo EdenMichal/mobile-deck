@@ -1,5 +1,9 @@
 # Changelog
 
+## Mobile Deck 1.2.1
+
+- **Cultist Initiate.** The Character Builder now offers this feat's spells: two Warlock cantrips and a level 1 Warlock spell, always prepared, with one free cast that comes back on a Short or Long Rest.
+
 ## Mobile Deck 1.2.0
 
 - **Biography paragraphs.** The Biography editor is now a text editor like My Journals: Return starts a new paragraph, pasted text comes in as plain text, and only Save saves. In the Characteristics fields, Return moves to the next field.

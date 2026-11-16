@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Mobile Deck 1.2.0
 
 - **Biography paragraphs.** The Biography editor is now a text editor like My Journals: Return starts a new paragraph, pasted text comes in as plain text, and only Save saves. In the Characteristics fields, Return moves to the next field.
 - **Name and portrait.** A Name and portrait card on the Biography tab changes the character's name and portrait after creation: upload a picture from the phone (through the GM's client for players who can't upload) or choose one from Foundry's files, optionally for the token too.

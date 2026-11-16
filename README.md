@@ -13,7 +13,7 @@ Mobile Deck gives **D&D5e** and **Pathfinder Second Edition** a phone and tablet
 
 Mobile Deck is a fork of [VE Mobile](https://github.com/Silvestrae/ve-mobile) by Silvestrae. The phone and tablet interface is Silvestrae's work. This fork adds:
 
-- **Character Builder (D&D5e).** Level up, create a new character and choose spells on your phone, with the GM's choice of compendiums, books and house rules. A GM can approve players' level-ups and new characters.
+- **Character Builder (D&D5e).** Level up, create a new character, change earlier choices and choose spells on your phone, with the GM's choice of compendiums, books and house rules. A GM can approve players' level-ups, changes and new characters.
 - **Player items.** Create and delete items from the Inventory tab.
 - **Party inventory.** Send, take, deposit and withdraw items and coins through a D&D5e Group actor, with every move run on the GM's client.
 - **My Journals.** Players keep private notes per character: folders, journals, text and picture pages, written on the phone. Only the player and the GM can open them in Foundry.
@@ -99,7 +99,7 @@ Use **Split Screen** to switch between the two tablet layouts.
 - **Groups** show members, shared supplies and travel details. Open a member's sheet and return to the group when you're done.
 - **Vehicles** show movement, stations, components and cargo. Use the available system actions from the sheet.
 
-- **Character Builder** opens from the Level up button in the character header, or from **New character** in the actor chooser. GMs choose the allowed compendiums, books and house rules in the module settings.
+- **Character Builder** opens from the Level up button in the character header, or from **New character** in the actor chooser. **Change choices** on the Level Up screen redoes earlier picks, ability scores, species, background or classes. GMs choose the allowed compendiums, books and house rules in the module settings.
 - **Inventory** has a **+** to create an item and **Delete** in each item's menu. **Send to Party** and the Party page move items and coins through the world's D&D5e Group actor.
 
 Use **Native configuration & edit** when you need the standard Foundry sheet.

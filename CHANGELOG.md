@@ -1,5 +1,11 @@
 # Changelog
 
+## Mobile Deck 1.2.2
+
+- **Change choices.** Players can change a character's earlier choices from the Level Up screen. They can redo any level's picks (skills, feats or ability increases, subclass, hit points, fighting styles and more), change the base ability scores, swap the species, background or a class, or drop a multiclass. Later choices are kept where they still fit, and Review lists anything to check. Spells and starting equipment stay as they are. With level-up approval on, a player's change goes to the GM like a level-up, and every change shows in Change history.
+- **Weapon masteries after a Long Rest.** A Long Rest now asks straight away whether to swap one weapon mastery. **Not now** keeps the swap for later. The question goes to the phone of the player who owns the character, even when the GM took the rest.
+- **Mastery names.** The Weapon masteries card and picker show each weapon's mastery (Club: Slow). The picker hadn't been showing them.
+
 ## Mobile Deck 1.2.1
 
 - **Cultist Initiate.** The Character Builder now offers this feat's spells: two Warlock cantrips and a level 1 Warlock spell, always prepared, with one free cast that comes back on a Short or Long Rest.

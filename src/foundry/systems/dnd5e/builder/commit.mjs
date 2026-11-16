@@ -8,6 +8,7 @@ import { hpFromAnswer, reviewChanges } from "./review-diff.mjs";
 import { builderSnapshot, classSummary } from "./snapshot.mjs";
 import { featSpellWarnings } from "./feature-spells.mjs";
 import { sessionDataWarnings } from "./data-checks.mjs";
+import { isEditTarget, pairRecreatedItems } from "./edit-rules.mjs";
 
 /** HTML-escaped text for chat cards (Foundry's escapeHTML, or a plain fallback). Shared by the builder's chat cards. */
 export const esc = s => (globalThis.foundry?.utils?.escapeHTML ? globalThis.foundry.utils.escapeHTML(String(s)) : String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`));
@@ -22,6 +23,14 @@ export function hpDetail(session) {
 export function sessionReview(session, t) {
   const before = builderSnapshot(session.actor);
   const after = builderSnapshot(session.manager.clone);
+  const edit = isEditTarget(session.target);
+  if (edit) {
+    // Items dnd5e re-created for the same feature keep their id when committed (cloneDiff), so they aren't changes.
+    const beforeIds = new Set(before.items.map(i => i.id));
+    const afterIds = new Set(after.items.map(i => i.id));
+    const map = pairRecreatedItems(after.items.filter(i => !beforeIds.has(i.id)), before.items.filter(i => !afterIds.has(i.id)));
+    after.items = after.items.map(i => (map.has(i.id) ? { ...i, id: map.get(i.id) } : i));
+  }
   const stepOf = {};
   for (const entry of session.path) {
     if (entry.type === "HitPoints") stepOf.hp ??= entry.index;
@@ -48,7 +57,8 @@ export function sessionReview(session, t) {
   // so picks dropped later (an edited subclass, a pack switched off) still show as "not chosen".
   const spells = spellPath ? { step: spellPath.index, spellbookClass: Boolean(spellPath.extra?.owed?.spellbookClass),
     swaps: spellAnswer?.data?.swaps ?? [], warnings: spellPath.extra?.warnings ?? [], freed: spellPath.extra?.freed ?? [] } : null;
-  return { before, after, groups: reviewChanges(before, after, { hp: hpDetail(session), stepOf, t, spells, notes: sessionNotes(session, t) }) };
+  // An edit gains no level: its HP change is the plain difference (no "rolled 7 + 2 CON" for a level).
+  return { before, after, groups: reviewChanges(before, after, { hp: edit ? null : hpDetail(session), stepOf, t, spells, notes: sessionNotes(session, t) }) };
 }
 
 /**
@@ -87,7 +97,7 @@ export function sessionNotes(session, t, { isGM = Boolean(globalThis.game?.user?
  * `approvalOf`: the submission a GM's Approve commits (Phase 4b), stamped on the change-log entry so a retry can tell it
  * is already saved. An error thrown after the first write carries `error.partial = true`: the actor is half-changed.
  */
-export async function commitSession(session, { moduleId, kind = "level-up", t, game = globalThis.game, author = game.user, approvedBy = null, approvalOf = null } = {}) {
+export async function commitSession(session, { moduleId, kind = "level-up", t, game = globalThis.game, author = game.user, approvedBy = null, approvalOf = null, label = "" } = {}) {
   const actor = session.actor;
   const manager = session.manager;
   const { before, after, groups } = sessionReview(session, t);
@@ -95,7 +105,7 @@ export async function commitSession(session, { moduleId, kind = "level-up", t, g
   const { updates, toCreate, toUpdate, toDelete } = cloneDiff(manager);
 
   const entry = buildChangeLogEntry({
-    kind, user: author, approvedBy, approvalOf, date: Date.now(),
+    kind, user: author, approvedBy, approvalOf, date: Date.now(), label,
     before: { level: before.level, label: classSummary(before) },
     after: { level: after.level, label: classSummary(after) },
     groups,
@@ -115,9 +125,23 @@ export async function commitSession(session, { moduleId, kind = "level-up", t, g
   // One after another rather than Promise.all, so a failure stops at a known point.
   await actor.update(updates, { isAdvancement: true });
   try {
+    // dnd5e refuses a second species or background while the old one is still on the character, so an edit that swaps
+    // one deletes it first. Everything else keeps create → update → delete: a create that fails then leaves the old
+    // items (a replaced class and its features) in place instead of a character with nothing.
+    const first = kind === "edit" ? toDelete.filter(id => ["race", "background"].includes(actor.items.get(id)?.type)) : [];
+    const rest = toDelete.filter(id => !first.includes(id));
+    if (first.length) await actor.deleteEmbeddedDocuments("Item", first, { isAdvancement: true });
     if (toCreate.length) await actor.createEmbeddedDocuments("Item", toCreate, { keepId: true, isAdvancement: true });
     if (toUpdate.length) await actor.updateEmbeddedDocuments("Item", toUpdate, { diff: false, recursive: false, isAdvancement: true });
-    if (toDelete.length) await actor.deleteEmbeddedDocuments("Item", toDelete, { isAdvancement: true });
+    if (rest.length) await actor.deleteEmbeddedDocuments("Item", rest, { isAdvancement: true });
+    // details.race / background are links to embedded items: an edit that swaps them (a new species) can only point at
+    // the new item once it exists, so the link is set again here.
+    const want = manager.clone._source.system?.details ?? {};
+    const links = {};
+    for (const key of ["race", "background", "originalClass"]) {
+      if (want[key] && actor._source.system?.details?.[key] !== want[key] && actor.items.get(want[key])) links[`system.details.${key}`] = want[key];
+    }
+    if (Object.keys(links).length) await actor.update(links, { isAdvancement: true });
     Hooks.callAll("dnd5e.advancementManagerComplete", manager);
   } catch (error) {
     // The actor update (and the change-log entry) went through: this level-up is saved only in part.
@@ -132,9 +156,10 @@ export async function commitSession(session, { moduleId, kind = "level-up", t, g
 /** A compact chat card for the GMs and the player whose build it is (author), saying who approved it (Phase 4b). */
 export async function whisperSummary(actor, entry, game = globalThis.game) {
   const groups = entry.groups.map(g => `<p><strong>${esc(g.title)}</strong></p><ul>${g.lines.map(l => `<li>${esc(l.text)}</li>`).join("")}</ul>`).join("");
-  const verb = entry.kind === "creation" ? "created this character" : "committed this level-up";
+  const verb = entry.kind === "creation" ? "created this character" : entry.kind === "edit" ? "changed this character's choices" : "committed this level-up";
   const approved = entry.approvedBy ? `; approved by ${esc(entry.approvedBy.name)}` : "";
-  const content = `<div class="ve-builder-chat-card"><h3>${esc(actor.name)}: ${esc(entry.before.label)} → ${esc(entry.after.label)}</h3>`
+  const heading = entry.label ? esc(entry.label) : `${esc(entry.before.label)} → ${esc(entry.after.label)}`;
+  const content = `<div class="ve-builder-chat-card"><h3>${esc(actor.name)}: ${heading}</h3>`
     + `<p><em>${esc(entry.user.name)} ${verb} in Mobile Deck${approved}.</em></p>${groups}</div>`;
   const whisper = [...new Set([...game.users.filter(u => u.isGM).map(u => u.id), entry.user.id, game.user.id].filter(Boolean))];
   return ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content, whisper });

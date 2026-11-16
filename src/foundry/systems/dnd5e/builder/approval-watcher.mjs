@@ -30,7 +30,8 @@ export function startApprovalWatcher({ moduleId, t, levelUpController, game = gl
   const paused = () => globalThis.veBuilderApprovalPaused === true;
   const notify = (kind, text) => globalThis.ui?.notifications?.[kind]?.(text);
   const schedule = (delay = 250) => { clearTimeout(timer); timer = setTimeout(() => check().catch(error => console.error(`${moduleId} | approval check failed`, error)), delay); };
-  const whatOf = sub => (sub.kind === "creation" ? t("Approval.WhatNew", "a new character{name}", { name: sub.label ? ` (${sub.label})` : "" }) : t("Approval.WhatLevel", "a level-up ({label})", sub));
+  const whatOf = sub => (sub.kind === "creation" ? t("Approval.WhatNew", "a new character{name}", { name: sub.label ? ` (${sub.label})` : "" })
+    : sub.edit ? t("Approval.WhatEdit", "a change of choices ({label})", sub) : t("Approval.WhatLevel", "a level-up ({label})", sub));
   /** Requests this page may act on: not one another page is approving right now. */
   const actionable = () => service.list().filter(s => !claimedElsewhere(s, pageId(), serverNow(game)));
   /** A claim by another page that goes stale later: look again then (a GM page that died mid-approval). */

@@ -10,6 +10,7 @@
  * passed in are server time (serverNow), never a device's own clock.
  */
 import { isCreationDraft } from "./creation-tabs.mjs";
+import { isEditTarget } from "./edit-rules.mjs";
 import { isBanned } from "./source-filter.mjs";
 
 export const STATUSES = Object.freeze(["draft", "submitted", "approving", "rejected"]);
@@ -131,7 +132,7 @@ export function collectSubmissions(users = []) {
     for (const [actorId, draft] of Object.entries(user.builder.drafts ?? {})) {
       if (!isWaiting(draft)) continue;
       list.push({ userId: user.id, userName: user.name, kind: "level-up", key: resultKey("level-up", actorId), actorId,
-        submittedAt: Number(draft.submittedAt) || 0, label: String(draft.label ?? ""), ...claimOf(draft) });
+        submittedAt: Number(draft.submittedAt) || 0, label: String(draft.label ?? ""), ...claimOf(draft), ...(isEditTarget(draft.target) ? { edit: true } : {}) });
     }
   }
   return list.sort((a, b) => a.submittedAt - b.submittedAt);

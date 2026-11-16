@@ -9,7 +9,8 @@ import { checkMasteryChange } from "../../foundry/systems/dnd5e/builder/mastery-
 import { createShell } from "./builder-shell.mjs";
 import { emptyCard, sheetCard } from "./ve-parts.mjs";
 
-export function mountMasteryPicker(host, manager, { t, onClose = () => {} }) {
+/** `afterRest`: opened by a Long Rest (not the card): says why, and offers Not now. */
+export function mountMasteryPicker(host, manager, { t, onClose = () => {}, afterRest = false }) {
   const shell = createShell(host, { t, subtitle: manager.actorName, controller: { isGM: manager.isGM }, headIcon: "fa-swords", onClose });
   shell.layer.classList.add("ve-mastery-layer");
   const { frame, work, setBody, showError } = shell;
@@ -28,7 +29,9 @@ export function mountMasteryPicker(host, manager, { t, onClose = () => {} }) {
     const selected = new Set(before);
     const proficient = new Set(options.filter(o => o.proficient).map(o => o.key));
     let check = null;
-    const scope = frame({ screen: "mastery", heading: t("Mastery.Title", "Weapon masteries"), nextText: t("Mastery.Save", "Save"), nextIcon: "fa-check",
+    const scope = frame({ screen: afterRest ? "mastery-rest" : "mastery", heading: afterRest ? t("Mastery.RestTitle", "Long Rest: weapon masteries") : t("Mastery.Title", "Weapon masteries"),
+      nextText: t("Mastery.Save", "Save"), nextIcon: "fa-check",
+      ...(afterRest ? { back: () => shell.close(), backText: t("Mastery.NotNow", "Not now") } : {}),
       next: () => void work(async () => {
         await manager.save([...selected]).catch(error => { throw new Error(reasons[error?.masteryReason] ?? error?.message ?? String(error)); });
         shell.close();
@@ -37,6 +40,8 @@ export function mountMasteryPicker(host, manager, { t, onClose = () => {} }) {
     if (!options.length) { setBody(emptyCard(t("Mastery.NoWeapons", "No weapons were found."))); ctx.validChanged(false); return; }
 
     const counter = node("strong");
+    const lead = afterRest ? node("p", { className: "ve-builder-lead ve-mastery-rest-lead",
+      text: t("Mastery.RestLead", "You finished a Long Rest, so you can swap one weapon mastery. Not now keeps them as they are, and the Weapon masteries card still lets you swap one later.") }) : null;
     const hint = node("p", { className: "ve-builder-hint ve-mastery-hint", attrs: { role: "status", "aria-live": "polite" } });
     const rows = options.map(option => {
       const button = node("button", { className: "ve-builder-chip ve-mastery-chip", attrs: { type: "button", "aria-pressed": "false", disabled: !option.proficient && !manager.isGM },
@@ -67,6 +72,7 @@ export function mountMasteryPicker(host, manager, { t, onClose = () => {} }) {
     refresh();
     setBody(
       sheetCard({ className: "ve-mastery-card", children: [
+        lead,
         node("div", { className: "ve-builder-spell-counters", dataset: { count: "1" }, children: [node("div", { className: "ve-builder-spell-counter", children: [
           node("small", { text: t("Mastery.Known", "Masteries") }), counter] })] }),
         hint,
@@ -92,7 +98,9 @@ export function masteryCard(summary, { t, onChange, scope, canEdit }) {
   return node("section", { className: "ve-sheet-card ve-traits-preview ve-mastery-preview", children: [
     node("header", { className: "ve-sheet-card-heading", children: [icon("fa-swords"), node("h3", { text: t("Mastery.Title", "Weapon masteries") }), action] }),
     node("div", { className: "ve-traits-list", children: [node("article", { className: "ve-trait-group", children: [
-      node("div", { className: "ve-trait-pills", children: summary.chosen.length ? summary.chosen.map(c => node("span", { text: c.label }))
+      // Each weapon with its mastery property ("Longsword  Sap"), as the picker shows them.
+      node("div", { className: "ve-trait-pills", children: summary.chosen.length ? summary.chosen.map(c => node("span", {
+        attrs: { title: c.mastery ? `${c.label}: ${c.mastery}` : c.label }, children: [c.label, c.mastery ? node("small", { text: c.mastery }) : null] }))
         : [node("span", { text: t("Mastery.NoneYet", "None chosen yet") })] }),
       pending ? node("p", { className: "ve-mastery-note", text: t("Mastery.ChooseMore", "Choose {count} more.", { count: summary.free }) })
         : summary.swap ? node("p", { className: "ve-mastery-note", text: t("Mastery.SwapReady", "Long Rest: you can change one mastery.") }) : null

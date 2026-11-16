@@ -3,7 +3,8 @@
 //   B. Ideals textarea: a real keyboard paste (clipboard) lands in the field.
 //   C. Name and portrait: rename, upload a picture, Save.
 //   D. Manage spells: the wand on the Spells tab, add a spell, remove it.
-//   E. Weapon masteries: the Overview card, no change without a Long Rest, a Long Rest gives one swap, Save spends it.
+//   E. Weapon masteries: the Overview card (each weapon's mastery), no change without a Long Rest, a Long Rest asks on the
+//      player's phone (Not now keeps the swap; the next rest asks again), Save spends it.
 // Builds a Fighter 1 / Wizard 1 with the engine; cleans up the actor, uploads and chat messages.
 // Run: PLAYWRIGHT=/path/to/playwright/index.mjs node tests/foundry/sheet-edits-phone.e2e.mjs
 import fs from "fs";
@@ -127,6 +128,7 @@ try {
     const masteryCard = pp.locator(".ve-mastery-preview");
     await masteryCard.waitFor({ timeout: 15000 });
     check("E: the Weapon masteries card lists the masteries", (await masteryCard.locator(".ve-trait-pills span").count()) === setup.masteries.length);
+    await masteryCard.scrollIntoViewIfNeeded();
     await pshot("mastery-card");
     await masteryCard.locator(".ve-sheet-card-action").click();
     await pp.waitForSelector('.ve-mastery-layer[data-screen="mastery"]');
@@ -134,24 +136,43 @@ try {
     const firstLabels = await chips.evaluateAll(list => list.slice(0, 40).map(c => ({ label: c.textContent, disabled: c.disabled })));
     const firstDisabled = firstLabels.findIndex(c => c.disabled);
     check("E: a Fighter is proficient with every weapon (none greyed out)", firstDisabled === -1, firstLabels.slice(0, 6));
+    const chipMasteries = await chips.evaluateAll(list => list.map(c => c.querySelector("small")?.textContent ?? ""));
+    check("E: the picker shows each weapon's mastery", chipMasteries.filter(Boolean).length >= chipMasteries.length - 2, chipMasteries.slice(0, 8));
     await pshot("mastery-picker");
     // Masteries need proficiency: a Fighter is proficient with every weapon, so nothing is greyed out for one.
-    const chipText = selector => pp.locator(`.ve-mastery-layer ${selector}`).first().innerText();
+    // A chip is the weapon's name and its mastery ("Club" / "Slow"): matched on the exact name ("Club" isn't "Greatclub").
+    const chipText = selector => pp.locator(`.ve-mastery-layer ${selector}`).first().locator("span").first().innerText();
+    const chipNamed = name => pp.locator(".ve-mastery-layer .ve-mastery-chip", { has: pp.locator("span", { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }) }).first();
     const swapOnce = async () => {
       const out = await chipText(".ve-mastery-chip.is-selected");
       const into = await chipText(".ve-mastery-chip:not(.is-selected):not([disabled])");
-      await pp.locator(".ve-mastery-layer .ve-mastery-chip", { hasText: out }).first().click();
-      await pp.locator(".ve-mastery-layer .ve-mastery-chip", { hasText: into }).first().click();
+      await chipNamed(out).click();
+      await chipNamed(into).click();
     };
     await swapOnce();
     const save = pp.locator(".ve-mastery-layer .ve-builder-footer .ve-builder-primary");
     check("E: no swap before a Long Rest (Save disabled)", await save.isDisabled());
     await pp.locator(".ve-mastery-layer .ve-builder-close").click();
-    await page.evaluate(async id => { await game.actors.get(id).longRest({ dialog: false, chat: false }); }, setup.actorId);
-    await pp.waitForTimeout(800);
-    check("E: a Long Rest gives one swap", (await actorState()).swap === true);
-    await masteryCard.locator(".ve-sheet-card-action").click();
-    await pp.waitForSelector('.ve-mastery-layer[data-screen="mastery"]');
+    // Each pill names the weapon's mastery property, as the picker does.
+    const pillMasteries = await masteryCard.locator(".ve-trait-pills span").evaluateAll(list => list.map(s => s.querySelector("small")?.textContent ?? ""));
+    check("E: the card shows each weapon's mastery", pillMasteries.length === setup.masteries.length && pillMasteries.every(Boolean), pillMasteries);
+    // The GM's client takes the rest; the player's phone asks about the swap at once (the GM's doesn't).
+    const longRest = () => page.evaluate(async id => { await game.actors.get(id).longRest({ dialog: false, chat: false }); }, setup.actorId);
+    const restPrompt = '.ve-mastery-layer[data-screen="mastery-rest"]';
+    await longRest();
+    await pp.waitForSelector(restPrompt, { timeout: 15000 });
+    check("E: a Long Rest gives one swap", (await actorState()).swap);
+    const promptText = await pp.locator(restPrompt).innerText();
+    check("E: the player's phone asks about the swap after the rest", /Long Rest/.test(promptText) && /swap one weapon mastery/.test(promptText), promptText.slice(0, 300));
+    check("E: the GM who rested isn't asked (the player is online)", await page.locator(".ve-mastery-layer").count() === 0);
+    await pshot("mastery-rest-prompt");
+    await pp.locator(`${restPrompt} .ve-builder-footer .ve-builder-secondary`, { hasText: "Not now" }).click();
+    await pp.waitForSelector(".ve-mastery-layer", { state: "detached", timeout: 15000 });
+    check("E: Not now keeps the swap, and the card says so", (await actorState()).swap && /Long Rest: you can change one mastery/.test(await masteryCard.innerText()));
+    // A second rest with the swap still unused asks again; the swap is made from the prompt.
+    await longRest();
+    await pp.waitForSelector(restPrompt, { timeout: 15000 });
+    check("E: a later rest asks again while the swap is unused", true);
     await swapOnce();
     await pshot("mastery-swap");
     await save.click();

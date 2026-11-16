@@ -18,7 +18,7 @@ import { createCreationController } from "./creation-controller.mjs";
 import { mountCreator } from "../../../../features/builder/creation-layer.mjs";
 import { castingClasses, createSpellManager } from "./spell-manager.mjs"; // Player feedback (fork): Manage spells
 import { mountSpellManager } from "../../../../features/builder/spell-manager-layer.mjs";
-import { createMasteryManager, masterySummary, registerMasteryRestHook } from "./weapon-mastery.mjs"; // Player feedback (fork): Weapon Mastery
+import { addMasteryIndexField, createMasteryManager, loadMasteryIndex, masterySummary, registerMasteryPrompt, registerMasteryRestHook } from "./weapon-mastery.mjs"; // Player feedback (fork): Weapon Mastery
 import { mountMasteryPicker } from "../../../../features/builder/mastery-layer.mjs";
 import { approvalResult, asApproving, asDraft, asRejected, asSubmitted, asUnclaimed, canClaim, canWithdraw, holdsClaim, isWaiting, needsApproval, pageId,
   resultKey, sameSubmission, serverNow, statusOf, submissionId } from "./approval-rules.mjs";
@@ -330,7 +330,16 @@ export function createBuilderGateway({ moduleId = MODULE_ID } = {}) {
   registerBuilderSettings(moduleId);
   // Phase 4b: the active GM's client shows players' submissions (desktop or VE); every client registers, only that one acts.
   startApprovalWatcher({ moduleId, t, levelUpController: createBuilderController });
+  addMasteryIndexField();
   registerMasteryRestHook();
+  // After a Long Rest: ask the owner about the mastery swap at once (the picker, with Not now). Never on top of
+  // something already open; the sheet card still says the swap is there.
+  registerMasteryPrompt({ onSwapReady: actor => {
+    if (current || !canLevelUp(actor)) return;
+    token++;
+    const layer = mountMasteryPicker(host(), createMasteryManager(actor), { t, afterRest: true, onClose: () => { if (current === layer) current = null; } });
+    current = layer;
+  } });
   return Object.freeze({
     open({ actorSourceUuid } = {}) {
       const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));
@@ -368,6 +377,8 @@ export function createBuilderGateway({ moduleId = MODULE_ID } = {}) {
       current = layer;
       return true;
     },
+    /** Build dnd5e's weapon index (each weapon's mastery) once the world is ready; true when it was built. */
+    loadMasteries: () => loadMasteryIndex(),
     /** Player feedback (fork): the sheet's Weapon masteries card record, or null. */
     masterySummary({ actorSourceUuid } = {}) {
       const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));

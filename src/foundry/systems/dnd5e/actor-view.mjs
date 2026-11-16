@@ -5,7 +5,8 @@ import { characterHeaderRecord } from "./character-header.mjs";
 import { normalizeBannerClassification } from "../../../kernel/header-banner.mjs";
 import { collectiveActorData } from "./collective-actor-view.mjs";
 import { partyViewRecord } from "./party-stash.mjs";
-import { canDeleteItem, containedItemCount } from "./item-delete-actions.mjs"; // Player feedback (fork): Delete in the item menu
+import { canDeleteItem, containedItemCount } from "./item-delete-actions.mjs";
+import { masterySummary } from "./builder/weapon-mastery.mjs"; // Player feedback (fork): the Weapon masteries card // Player feedback (fork): Delete in the item menu
 
 const ABILITY_LABELS = Object.freeze({
   str: "Strength",
@@ -186,6 +187,8 @@ export function createActorViewRecord(actor, user, capabilitiesForActor = () => 
     themeClassKey: themeClassKeys[0] ?? "neutral",
     themeClassKeys,
     capabilities: capabilitiesForActor(actor, user),
+    // The sheet redraws only when this record changes: the masteries and the Long Rest swap (a flag) are part of it.
+    weaponMastery: masterySummary(actor),
     abilities,
     skills,
     toolProficiencies,

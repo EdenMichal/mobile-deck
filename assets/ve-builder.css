@@ -904,6 +904,7 @@
 /* Player feedback (fork): Weapon Mastery picker. */
 .ve-mastery-card .ve-builder-spell-counters { margin: 12px 12px 0; }
 .ve-mastery-hint { margin: 10px 13px 0; }
+.ve-mastery-rest-lead { margin: 12px 13px 0; }
 .ve-mastery-hint.is-error { color: var(--ve-red-bright, var(--ve-red)); font-weight: 700; }
 .ve-mobile-app .ve-builder button.ve-mastery-chip { display: inline-grid; gap: 1px; text-align: center; }
 .ve-mobile-app .ve-builder button.ve-mastery-chip small { color: var(--ve-subtle); font-size: 0.6rem; font-weight: 700; }

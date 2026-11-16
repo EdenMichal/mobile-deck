@@ -68,3 +68,14 @@ export function isProficient(proficiencies, weapon, category) {
   const set = proficiencies instanceof Set ? proficiencies : new Set(proficiencies ?? []);
   return set.has(weapon) || (Boolean(category) && set.has(category));
 }
+
+/**
+ * Should this client ask about the Long Rest swap? The swap is a flag on the actor, so every client sees it arrive.
+ * A player who owns the character is asked. A GM is asked only for a character no active player owns, and only on
+ * the GM client that took the rest (`byThisUser`), so a GM resting a player's character doesn't get the question.
+ */
+export function shouldAskSwap({ isGM = false, isOwner = false, playerOwnerActive = false, byThisUser = false } = {}) {
+  if (!isOwner) return false;
+  if (!isGM) return true;
+  return !playerOwnerActive && byThisUser;
+}

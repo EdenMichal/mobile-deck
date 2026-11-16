@@ -92,7 +92,7 @@ export function createShell(host, { t, subtitle = "", controller, onClose = () =
     errorBox.textContent = message ?? "";
   }
 
-  function frame({ screen, heading, sub: subText, percent = 0, back = null, next = null, nextText = t("Next", "Next"), nextIcon = "fa-arrow-right" }) {
+  function frame({ screen, heading, sub: subText, percent = 0, back = null, backText = t("Back", "Back"), next = null, nextText = t("Next", "Next"), nextIcon = "fa-arrow-right" }) {
     screenScope?.dispose();
     layer.dataset.screen = screen ?? "";
     screenScope = createScope();
@@ -102,6 +102,7 @@ export function createShell(host, { t, subtitle = "", controller, onClose = () =
     onBack = back;
     onNext = next;
     backButton.hidden = !back;
+    backButton.querySelector("span").textContent = backText;
     nextButton.hidden = !next;
     nextLabel.textContent = nextText;
     nextButton.querySelector("i")?.setAttribute("class", `fa-solid ${nextIcon}`);

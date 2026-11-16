@@ -100,6 +100,7 @@ function choiceList(options, { scope, ctx, max = 1, selected = [], search = opti
 const blockerTextFor = t => blockers => blockers.map(b => {
   if (b.key === "level") return t("Blocker.Level", "Needs level {level}", { level: b.level });
   if (b.key === "repeat") return t("Blocker.Repeat", "Already taken");
+  if (b.key === "noCantrip") return t("Blocker.NoCantrip", "Already on every damage cantrip you know");
   if (b.key === "items") return t("Blocker.Items", "Needs {items}", { items: b.items.join(", ") });
   if (b.abilities) return t("Blocker.Multiclass", "{name} needs 13+ in {abilities}", { name: b.name, abilities: b.abilities.map(a => a.toUpperCase()).join(b.any ? " or " : " and ") });
   return "";

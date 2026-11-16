@@ -128,9 +128,17 @@ export async function stepModel(session) {
     const taken = new Set(Object.values(adv.value?.added ?? {}).flatMap(byLevel => Object.values(byLevel ?? {})));
     // Fix 4: a repeatable item (Agonizing Blast, Eldritch Spear…) may be taken again.
     const repeatable = o => Boolean(o.system?.prerequisites?.repeatable);
+    // Player feedback (fork): a cantrip invocation (Agonizing Blast…) repeats only onto a different damage cantrip, so
+    // another copy needs one more Warlock damage cantrip than the copies the character already has.
+    const copiesOf = o => clone.items.filter(i => i.type === o.type && cantripTargetKey(i) === cantripTargetKey(o)).length;
+    const noTarget = o => {
+      if (!cantripTargetKey(o) || !copiesOf(o)) return false;
+      return copiesOf(o) >= warlockDamageCantrips(clone);
+    };
     return { ...base, count, itemType: config.type ?? "", ...replacement, missing,
       options: options.map(o => ({ uuid: o.uuid, name: o.name, img: o.img, source: o.source ?? "", tier: o.tier ?? null,
-        blockers: uniqueBlockers([...(taken.has(o.uuid) && !repeatable(o) ? [{ key: "repeat" }] : []), ...(o.system ? featBlockers(o, clone, level) : [])]) })),
+        blockers: uniqueBlockers([...(taken.has(o.uuid) && !repeatable(o) ? [{ key: "repeat" }] : []),
+          ...(noTarget(o) ? [{ key: "noCantrip" }] : []), ...(o.system ? featBlockers(o, clone, level) : [])]) })),
       ...(config.type === "spell" ? abilityModel(adv, { answer: pending.answer?.data, actor: clone }) : {}) };
   }
 
@@ -147,6 +155,22 @@ export async function stepModel(session) {
   }
 
   return { ...base, type: "unsupported" };
+}
+
+/** Invocations that each improve one damage cantrip (2024: "choose a different eligible cantrip"); "" for any other item. */
+const CANTRIP_INVOCATIONS = new Set(["agonizing-blast", "eldritch-spear", "repelling-blast"]);
+function cantripTargetKey(item) {
+  const raw = String(item?.system?.identifier || item?.name || "");
+  const key = raw.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "");
+  return CANTRIP_INVOCATIONS.has(key) ? key : "";
+}
+
+/** Warlock cantrips that deal damage (an activity with damage parts). */
+function warlockDamageCantrips(actor) {
+  const onlyWarlock = Object.keys(actor.classes ?? {}).length === 1 && Boolean(actor.classes?.warlock);
+  return actor.items.filter(i => i.type === "spell" && !(Number(i.system?.level) || 0)
+    && (i.system?.classIdentifier === "warlock" || (onlyWarlock && !i.system?.classIdentifier))
+    && [...(i.system?.activities ?? [])].some(a => (a.damage?.parts?.length ?? 0) > 0)).length;
 }
 
 /** One blocker per reason ("Already taken" was listed twice: the advancement's own picks and the actor's items). */

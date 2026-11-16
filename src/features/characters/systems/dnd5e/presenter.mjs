@@ -24,6 +24,10 @@ import { actorSheetTabs, actorOriginBack, collectiveHeaderContent, renderCollect
 import { createItemButton } from "./item-create.mjs"; // Player feedback (fork): Create item
 import { confirmItemDelete, itemDeleteMenuAction } from "./item-delete.mjs"; // Player feedback (fork): Delete in the item menu
 import { partyEntryRow, partyItemMenuAction, partyPanel, partySheetModal, sendToPartyFromMenu } from "./party-panel.mjs";
+import { sanitizeHtml } from "../../../journals/page-writer.mjs";
+import { shrinkPicture } from "../../../journals/player-journals-layer.mjs";
+import { masteryCard } from "../../../builder/mastery-layer.mjs"; // Player feedback (fork): Weapon Mastery
+import { isBlankHtml } from "../../../../kernel/player-journal-rules.mjs";
 
 const SHEET_TABS = Object.freeze([
   ["favourites", "favourites", "Favourites"],
@@ -1194,8 +1198,26 @@ function overviewPanel(actor, commands, scope) {
   return node("div", { className: "ve-sheet-stack", children: [
     activeEffectsPreview(actor, () => commands.selectCharacterTab("effects"), commands, scope),
     abilitiesSavesPreview(actor, () => commands.selectCharacterTab("abilities"), commands, scope),
-    traitsPanel(actor, commands.localize)
+    traitsPanel(actor, commands.localize),
+    weaponMasteryPreview(actor, commands, scope) // Player feedback (fork): Weapon Mastery
   ] });
+}
+
+// Player feedback (fork): the Weapon masteries card, with Change for owners (new picks, or one swap after a Long Rest).
+function weaponMasteryPreview(actor, commands, scope) {
+  if (actor.type !== "character" || !commands.weaponMasterySummary) return null;
+  const sourceUuid = characterRecordSourceUuid(actor);
+  const summary = commands.weaponMasterySummary({ actorSourceUuid: sourceUuid });
+  if (!summary) return null;
+  return masteryCard(summary, {
+    t: (key, fallback, data) => localizedText(commands.localize, `VEMOBILE.Builder.${key}`, fallback, data),
+    canEdit: Boolean(actor.capabilities?.levelUp && commands.openMasteryPicker),
+    scope,
+    onChange: () => {
+      try { commands.openMasteryPicker({ actorSourceUuid: sourceUuid }); }
+      catch (error) { notifyCharacter(commands, sourceUuid, characterErrorMessage(commands, error, "Weapon masteries"), "error"); }
+    }
+  });
 }
 
 // Collect common native actions for the character overview card.
@@ -1384,6 +1406,8 @@ function spellsPanel(actor, commands, openItem, expandedItemId, openSectionIds, 
     draw();
   }, scope, commands.localize);
   controls.element.prepend(filterButton.element);
+  const manage = manageSpellsButton(actor, commands, scope); // Player feedback (fork): change spells after the fact
+  if (manage) controls.element.prepend(manage);
   const card = collectionCard(localizedText(commands.localize, "VEMOBILE.Character.Tabs.Spells", "Spells"), sheetTabIcon("spells"), [body], controls.element);
 
   // Redraw spell groups while preserving the selected casting class and filters.
@@ -1425,6 +1449,18 @@ function spellsPanel(actor, commands, openItem, expandedItemId, openSectionIds, 
   scope.listen(body, "click", () => queueMicrotask(controls.updateExpansion));
   draw();
   return card;
+}
+
+// Player feedback (fork): the wand button that opens Manage spells, for owners of a character with a casting class.
+function manageSpellsButton(actor, commands, scope) {
+  if (actor.type !== "character" || !actor.capabilities?.levelUp || !commands.openSpellManager
+    || !commands.canManageSpells?.({ actorSourceUuid: characterRecordSourceUuid(actor) })) return null;
+  const label = localizedText(commands.localize, "VEMOBILE.Builder.Manage.Title", "Manage spells");
+  return node("button", { className: "ve-sheet-collection-control ve-manage-spells", attrs: { type: "button", "aria-label": label, title: label },
+    on: { click: () => {
+      try { commands.openSpellManager({ actorSourceUuid: characterRecordSourceUuid(actor) }); }
+      catch (error) { notifyCharacter(commands, characterRecordSourceUuid(actor), characterErrorMessage(commands, error, label), "error"); }
+    } }, children: [icon("fa-wand-sparkles")] }, scope);
 }
 
 // Render class and actor features with their supported actions and expanded details.
@@ -1554,8 +1590,10 @@ function biographyPanel(actor, commands, scope) {
     description.removeAttribute("aria-busy");
     description.replaceChildren(node("p", { className: "ve-sheet-empty", text: characterErrorMessage(commands, error, localizedText(commands.localize, "VEMOBILE.Character.Presenter.BiographyCouldNotLoad", "Biography could not be loaded."), { readOnly: true }) }));
   });
+  const identity = ["character", "npc"].includes(actor.type) ? identityCard(actor, commands, scope) : null;
   if (["npc", "group", "vehicle"].includes(actor.type)) {
     return node("div", { className: "ve-sheet-stack ve-character-biography", children: [
+      identity,
       node("section", { className: "ve-sheet-card ve-character-biography-story", children: [sectionHeading(localizedText(commands.localize, "VEMOBILE.Character.Tabs.Biography", "Biography"), "fa-feather-pointed", storyEdit), description] })
     ] });
   }
@@ -1579,6 +1617,7 @@ function biographyPanel(actor, commands, scope) {
     originalValues: characteristicValues
   }, commands, scope), scope, commands.localize);
   return node("div", { className: "ve-sheet-stack ve-character-biography", children: [
+    identity,
     node("section", { className: "ve-sheet-card", children: [
       sectionHeading(characteristicsLabel, "fa-address-card", characteristicsEdit),
       node("dl", { className: "ve-character-biography-characteristics", children: characteristics.flatMap((entry) => [
@@ -1600,6 +1639,125 @@ function biographyPanel(actor, commands, scope) {
     }); }) }),
     node("section", { className: "ve-sheet-card ve-character-biography-story", children: [sectionHeading(localizedText(commands.localize, "VEMOBILE.Character.Tabs.Biography", "Biography"), "fa-feather-pointed", storyEdit), description] })
   ] });
+}
+
+// Player feedback (fork): the character's name and portrait, with an editor to change them after creation.
+function identityCard(actor, commands, scope) {
+  const label = localizedText(commands.localize, "VEMOBILE.Character.Identity.Title", "Name and portrait");
+  const canEdit = Boolean(actor.capabilities?.editBiography);
+  return node("section", { className: "ve-sheet-card ve-character-identity", children: [
+    sectionHeading(label, "fa-id-badge", biographyEditAction(label, canEdit, (anchor) => openIdentityEditor(anchor, actor, commands, scope), scope, commands.localize)),
+    node("div", { className: "ve-character-identity-body", children: [
+      actor.img ? node("img", { className: "ve-character-identity-portrait", attrs: { src: actor.img, alt: "", loading: "lazy", decoding: "async" } })
+        : node("span", { className: "ve-character-identity-portrait is-empty", children: [icon("fa-user")] }),
+      node("strong", { text: actor.name })
+    ] })
+  ] });
+}
+
+// Edit the name and portrait. A new portrait is uploaded (shrunk on the phone) or chosen from Foundry's files,
+// and only saved with Save.
+function openIdentityEditor(anchor, actor, commands, scope) {
+  const t = (key, fallback, data) => localizedText(commands.localize, `VEMOBILE.Character.Identity.${key}`, fallback, data);
+  const screen = anchor.closest(".ve-character-screen");
+  const host = screen?.__veCharacterOverlayHost ?? screen ?? anchor.ownerDocument?.body;
+  if (!host) return;
+  host.querySelector?.(".ve-biography-editor-layer")?.dispatchEvent(new Event("ve-close"));
+  const editorScope = scope.child("identity-editor");
+  let pending = false;
+  let busy = false;
+  let img = String(actor.img ?? "");
+  let close = () => {};
+  const name = node("input", { attrs: { type: "text", maxlength: "120", required: true, autocomplete: "off", autocapitalize: "words", enterkeyhint: "done", "aria-label": t("Name", "Name") } }, editorScope);
+  name.value = actor.name;
+  // Return closes the keyboard; only Save saves.
+  editorScope.listen(name, "keydown", (event) => { if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); name.blur(); } });
+  const preview = node("img", { className: "ve-character-identity-preview", attrs: { alt: t("PortraitPreview", "Portrait preview"), src: img || "icons/svg/mystery-man.svg" } });
+  const status = node("p", { className: "ve-biography-editor-status", attrs: { role: "status", "aria-live": "polite" } });
+  const setStatus = (text, error = false) => { status.textContent = text; status.classList.toggle("is-error", error); };
+  const tokenToo = node("input", { attrs: { type: "checkbox" } });
+  const setImage = (path) => { img = path; preview.src = path; setStatus(t("PortraitReady", "New portrait ready. Tap Save to keep it.")); };
+  const work = async (job) => {
+    if (busy || pending) return;
+    busy = true;
+    form.classList.add("is-pending");
+    try { await job(); }
+    catch (error) { if (!editorScope.disposed) setStatus(characterErrorMessage(commands, error, t("UploadFailed", "The picture couldn't be uploaded.")), true); }
+    finally { busy = false; form.classList.remove("is-pending"); }
+  };
+  const upload = node("button", { className: "ve-modal-button is-secondary", attrs: { type: "button" }, children: [icon("fa-camera"), node("span", { text: t("Upload", "Upload a picture") })],
+    on: { click: () => {
+      const input = node("input", { attrs: { type: "file", accept: "image/*", hidden: true } });
+      layer.append(input);
+      input.addEventListener("change", () => {
+        const file = input.files?.[0];
+        input.remove();
+        if (!file) return;
+        void work(async () => {
+          setStatus(t("Uploading", "Uploading picture…"));
+          const dataUrl = await shrinkPicture(file, (key, fallback) => localizedText(commands.localize, `VEMOBILE.PlayerJournals.${key}`, fallback));
+          const { path } = await commands.uploadCharacterPortrait(dataUrl, file.name.replace(/\.[^.]+$/u, ""));
+          if (!editorScope.disposed && path) setImage(path);
+        });
+      }, { once: true });
+      input.addEventListener("cancel", () => input.remove(), { once: true });
+      input.click();
+    } } }, editorScope);
+  const browse = commands.canBrowseImages?.() ? node("button", { className: "ve-modal-button is-secondary", attrs: { type: "button" }, children: [icon("fa-folder-open"), node("span", { text: t("Browse", "Choose from files") })],
+    on: { click: () => void work(async () => {
+      const path = await commands.browseImages(img);
+      if (!editorScope.disposed && path) setImage(path);
+    }) } }, editorScope) : null;
+  const cancel = node("button", { className: "ve-modal-button is-secondary", attrs: { type: "button" }, on: { click: () => { if (!pending) close(); } },
+    children: [icon("fa-xmark"), node("span", { text: localizedText(commands.localize, "VEMOBILE.Scene.Template.Cancel", "Cancel") })] }, editorScope);
+  const save = node("button", { className: "ve-modal-button is-primary", attrs: { type: "submit" },
+    children: [icon("fa-check"), node("span", { text: localizedText(commands.localize, "VEMOBILE.Character.Presenter.Save", "Save") })] });
+  const controls = [name, upload, browse, tokenToo, cancel, save].filter(Boolean);
+  const form = node("form", { className: "ve-biography-editor ve-identity-editor", attrs: { role: "dialog", "aria-modal": "true", "aria-labelledby": "ve-identity-editor-title" },
+    on: { submit: async (event) => {
+      event.preventDefault();
+      if (pending || busy || !form.reportValidity()) return;
+      pending = true;
+      form.classList.add("is-pending");
+      for (const control of controls) control.disabled = true;
+      try {
+        await commands.execute(ACTOR_COMMANDS.UPDATE_IDENTITY, { actorSourceUuid: characterRecordSourceUuid(actor), name: name.value, img,
+          tokenToo: tokenToo.checked, originalName: actor.name, originalImg: String(actor.img ?? "") });
+        if (editorScope.disposed) return;
+        notifyCharacter(commands, characterRecordSourceUuid(actor), t("Saved", "Name and portrait saved."));
+        close();
+      } catch (error) {
+        if (editorScope.disposed) return;
+        pending = false;
+        form.classList.remove("is-pending");
+        for (const control of controls) control.disabled = false;
+        setStatus(characterErrorMessage(commands, error, t("NotSaved", "The name and portrait could not be saved.")), true);
+      }
+    } },
+    children: [
+      node("header", { children: [
+        node("span", { className: "ve-hp-editor-heading-icon", children: [icon("fa-id-badge")] }),
+        node("div", { children: [node("small", { text: actor.name }), node("h2", { attrs: { id: "ve-identity-editor-title" }, text: t("Title", "Name and portrait") })] }),
+        node("button", { className: "ve-hp-editor-close", attrs: { type: "button", "aria-label": t("Close", "Close") }, on: { click: () => { if (!pending) close(); } }, children: [icon("fa-xmark")] }, editorScope)
+      ] }),
+      node("label", { className: "ve-biography-editor-composer", children: [node("span", { text: t("Name", "Name") }), name] }),
+      node("div", { className: "ve-identity-editor-portrait", children: [preview, node("div", { className: "ve-identity-editor-portrait-actions", children: [upload, browse].filter(Boolean) })] }),
+      node("label", { className: "ve-identity-editor-token", children: [tokenToo, node("span", { text: t("TokenToo", "Use the new portrait for the token too") })] }),
+      status,
+      node("div", { className: "ve-modal-actions", children: [cancel, save] })
+    ]
+  }, editorScope);
+  const layer = node("div", { className: `ve-biography-editor-layer${host === screen ? "" : " is-pane-scoped"}`, attrs: { role: "presentation" }, children: [form] });
+  close = () => {
+    if (editorScope.disposed) return;
+    layer.remove();
+    editorScope.dispose();
+  };
+  editorScope.listen(layer, "ve-close", close);
+  editorScope.listen(layer, "pointerdown", (event) => { if (event.target === layer && !pending && !busy) close(); });
+  editorScope.listen(anchor.ownerDocument ?? document, "keydown", (event) => { if (event.key === "Escape" && !pending) close(); });
+  editorScope.own(() => layer.remove());
+  host.append(layer);
 }
 
 // Render a biography edit affordance that reflects its current permission bit.
@@ -1631,15 +1789,62 @@ function openBiographyEditor(anchor, config, commands, scope) {
       return node("label", { children: [node("span", { text: entry.label }), input] });
     })
     : [];
-  const composer = config.section === "characteristics" ? null : node("textarea", {
-    attrs: {
-      maxlength: config.richText ? "100000" : "20000",
-      rows: config.richText ? "12" : "8",
-      spellcheck: "true",
-      "aria-label": localizedText(commands.localize, "VEMOBILE.Character.Presenter.Text", "{label} text", { label: (config.label) })
+  // Return in a one-line field moves to the next field instead of submitting: only the Save button saves.
+  for (const label of fields) {
+    editorScope.listen(label.querySelector("input"), "keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      const index = controls.indexOf(event.currentTarget);
+      const next = controls[index + 1];
+      if (next?.matches?.("input")) next.focus({ preventScroll: false });
+      else event.currentTarget.blur();
+    });
+  }
+  const textLabel = localizedText(commands.localize, "VEMOBILE.Character.Presenter.Text", "{label} text", { label: (config.label) });
+  // The rich Biography is written like a journal page: Return starts a new paragraph, and the HTML is kept (cleaned).
+  const composer = config.section === "characteristics" ? null : config.richText
+    ? node("div", { className: "ve-biography-rich-editor", attrs: {
+      contenteditable: "true", role: "textbox", "aria-multiline": "true", spellcheck: "true", autocapitalize: "sentences", "aria-label": textLabel
+    } })
+    : node("textarea", {
+      attrs: { maxlength: "20000", rows: "8", spellcheck: "true", autocapitalize: "sentences", "aria-label": textLabel }
+    }, editorScope);
+  const composerValue = () => {
+    if (!config.richText) return composer.value;
+    // Browsers leave the first line typed into an empty editor as bare text: wrap loose text and inline runs in <p>.
+    const doc = composer.ownerDocument;
+    const blocks = /^(P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|SECTION|TABLE|PRE|HR|FIGURE|ASIDE)$/u;
+    let run = null;
+    for (const child of [...composer.childNodes]) {
+      if (child.nodeType === 1 && blocks.test(child.nodeName)) { run = null; continue; }
+      if (!run) {
+        if (child.nodeType === 3 && !child.textContent.trim()) continue;
+        run = doc.createElement("p");
+        composer.insertBefore(run, child);
+      }
+      run.append(child);
     }
-  }, editorScope);
-  if (composer) {
+    const html = sanitizeHtml(composer.innerHTML);
+    return isBlankHtml(html) ? "" : html;
+  };
+  if (composer && config.richText) {
+    composer.innerHTML = sanitizeHtml(String(config.value ?? ""));
+    try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch { /* older browsers */ }
+    // Paste as plain text: pasted web pages bring styles and markup the phone can't show well.
+    editorScope.listen(composer, "paste", (event) => {
+      const text = event.clipboardData?.getData?.("text/plain");
+      if (typeof text !== "string") return;
+      event.preventDefault();
+      try { if (document.execCommand("insertText", false, text)) return; } catch { /* fall through */ }
+      const selection = composer.ownerDocument.getSelection?.();
+      if (!selection?.rangeCount) { composer.append(text); return; }
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(composer.ownerDocument.createTextNode(text));
+      range.collapse(false);
+    });
+    controls.push(composer);
+  } else if (composer) {
     composer.value = String(config.value ?? "");
     controls.push(composer);
   }
@@ -1678,7 +1883,7 @@ function openBiographyEditor(anchor, config, commands, scope) {
         : {
             actorSourceUuid: characterRecordSourceUuid(config.actor),
             section: config.section,
-            value: composer.value,
+            value: composerValue(),
             originalValue: config.originalValue,
             biographyField: config.biographyField
           };
@@ -1704,7 +1909,7 @@ function openBiographyEditor(anchor, config, commands, scope) {
       ] }),
       config.section === "characteristics"
         ? node("div", { className: "ve-biography-editor-fields", children: fields })
-        : node("label", { className: "ve-biography-editor-composer", children: [node("span", { text: config.richText ? localizedText(commands.localize, "VEMOBILE.Character.Presenter.TextAndFoundryRichHTML", "Text and Foundry-rich HTML") : config.label }), composer] }),
+        : node("label", { className: "ve-biography-editor-composer", children: [node("span", { text: config.label }), composer] }),
       node("div", { className: "ve-modal-actions", children: [cancel, save] })
     ]
   }, editorScope);

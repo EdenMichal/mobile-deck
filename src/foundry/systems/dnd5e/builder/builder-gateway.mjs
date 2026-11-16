@@ -17,6 +17,10 @@ import { spellDetails } from "./spell-details.mjs";
 import { mountBuilder } from "../../../../features/builder/builder-layer.mjs";
 import { createCreationController } from "./creation-controller.mjs";
 import { mountCreator } from "../../../../features/builder/creation-layer.mjs";
+import { castingClasses, createSpellManager } from "./spell-manager.mjs"; // Player feedback (fork): Manage spells
+import { mountSpellManager } from "../../../../features/builder/spell-manager-layer.mjs";
+import { createMasteryManager, masterySummary, registerMasteryRestHook } from "./weapon-mastery.mjs"; // Player feedback (fork): Weapon Mastery
+import { mountMasteryPicker } from "../../../../features/builder/mastery-layer.mjs";
 import { approvalResult, asApproving, asDraft, asRejected, asSubmitted, asUnclaimed, canClaim, canWithdraw, holdsClaim, isWaiting, needsApproval, pageId,
   resultKey, sameSubmission, serverNow, statusOf, submissionId } from "./approval-rules.mjs";
 import { CLAIM_SETTLE_MS } from "./creation-controller.mjs";
@@ -296,6 +300,7 @@ export function createBuilderGateway({ moduleId = MODULE_ID } = {}) {
   registerBuilderSettings(moduleId);
   // Phase 4b: the active GM's client shows players' submissions (desktop or VE); every client registers, only that one acts.
   startApprovalWatcher({ moduleId, t, levelUpController: createBuilderController });
+  registerMasteryRestHook();
   return Object.freeze({
     open({ actorSourceUuid } = {}) {
       const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));
@@ -316,6 +321,34 @@ export function createBuilderGateway({ moduleId = MODULE_ID } = {}) {
       await closeCurrent();
       if (mine !== token) return false;
       const layer = mountCreator(host(), createCreationController({ moduleId, t }), { t, onClose: () => { if (current === layer) current = null; } });
+      current = layer;
+      return true;
+    },
+    /** Player feedback (fork): the Manage spells layer for a character this user owns. */
+    canManageSpells({ actorSourceUuid } = {}) {
+      const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));
+      return canLevelUp(actor) && castingClasses(actor).length > 0;
+    },
+    openSpellManager({ actorSourceUuid } = {}) {
+      const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));
+      if (!canLevelUp(actor)) throw new Error(t("Manage.NotAllowed", "You can only manage spells of characters you own."));
+      token++;
+      closeCurrent();
+      const layer = mountSpellManager(host(), createSpellManager(actor), { t, onClose: () => { if (current === layer) current = null; } });
+      current = layer;
+      return true;
+    },
+    /** Player feedback (fork): the sheet's Weapon masteries card record, or null. */
+    masterySummary({ actorSourceUuid } = {}) {
+      const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));
+      return actor?.type === "character" ? masterySummary(actor) : null;
+    },
+    openMasteryPicker({ actorSourceUuid } = {}) {
+      const actor = globalThis.fromUuidSync?.(String(actorSourceUuid ?? ""));
+      if (!canLevelUp(actor)) throw new Error(t("Mastery.NotAllowed", "You can only change masteries of characters you own."));
+      token++;
+      closeCurrent();
+      const layer = mountMasteryPicker(host(), createMasteryManager(actor), { t, onClose: () => { if (current === layer) current = null; } });
       current = layer;
       return true;
     },

@@ -557,7 +557,9 @@ if (isGamePage) {
     t: (key, fallback, data) => localizeFoundry(`VEMOBILE.PlayerJournals.${key}`, fallback, data),
     readFontSize: () => session.readJournalFontSize?.() ?? 16 });
   const playerJournals = Object.freeze({ available: () => playerJournalGateway.available(), characters: () => playerJournalGateway.characters(),
-    open: actorId => playerJournalOpener.open(actorId), close: () => playerJournalOpener.close() });
+    open: actorId => playerJournalOpener.open(actorId), close: () => playerJournalOpener.close(),
+    uploadPortrait: (dataUrl, name) => playerJournalGateway.uploadPortrait(dataUrl, name),
+    canBrowseImages: () => playerJournalGateway.canBrowseImages(), browseImages: current => playerJournalGateway.browseImages(current) });
   const quickbarGateway = systemIntegration.services.quickbar({ isActive: () => kernel?.active === true && readPolicy().active });
   const customHeaderGateway = createCustomHeaderGateway({ isActive: () => kernel?.active === true && readPolicy().active });
   const hotbarGateway = systemIntegration.services.hotbar({ isActive: () => kernel?.active === true && readPolicy().active });

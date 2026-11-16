@@ -95,7 +95,7 @@ const CASTING_ABILITY = { bard: "cha", cleric: "wis", druid: "wis", sorcerer: "c
 
 /**
  * How the builder handles a feat whose spells have no advancement (DDB imports), by the feat's identifier:
- * - picks: { list?, cantrips?, spells?, schools?, fixed?: [spell identifiers], ability?, abilities? }
+ * - picks: { list?, cantrips?, spells?, schools?, fixed?: [spell identifiers], ability?, abilities?, recovery?: "lr" | "sr" }
  * - { warnOnly: true }: a Review warning that the spells must be added by hand.
  * null for any other feat.
  */
@@ -103,6 +103,8 @@ export function featSpellRule(identifier = "") {
   const id = String(identifier);
   const mi = id.match(/^magic-initiate-(bard|cleric|druid|sorcerer|warlock|wizard)$/);
   if (mi) return { list: mi[1], cantrips: 2, spells: 1, ability: CASTING_ABILITY[mi[1]] };
+  // Player feedback (fork): Cultist Initiate (homebrew): Magic Initiate (Warlock) with INT/WIS/CHA, free cast back on a Short Rest.
+  if (/^cult(ist)?-initiate$/.test(id)) return { list: "warlock", cantrips: 2, spells: 1, abilities: ["int", "wis", "cha"], recovery: "sr" };
   if (id === "fey-touched") return { fixed: ["misty-step"], spells: 1, schools: ["div", "enc"], abilities: ["int", "wis", "cha"] };
   if (id === "shadow-touched") return { fixed: ["invisibility"], spells: 1, schools: ["ill", "nec"], abilities: ["int", "wis", "cha"] };
   if (/^(telekinetic|telepathic|ritual-caster(-[a-z]+)?|mythal-touched|artificer-initiate|magic-initiate|drow-high-magic|wood-elf-magic|fey-teleportation|svirfneblin-magic)$/.test(id)) {

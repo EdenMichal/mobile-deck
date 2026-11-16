@@ -48,7 +48,7 @@ function levelledClass(manager, actor) {
 }
 
 /** Add compendium spells to the copy as builder grants. Returns the names added. */
-async function grantSpells(clone, uuids, { sourceItem, grant, prepared = 2, method = "spell", ability = "", uses = false } = {}) {
+async function grantSpells(clone, uuids, { sourceItem, grant, prepared = 2, method = "spell", ability = "", uses = false, recovery = "lr" } = {}) {
   const added = [];
   for (const uuid of uuids) {
     try {
@@ -61,7 +61,7 @@ async function grantSpells(clone, uuids, { sourceItem, grant, prepared = 2, meth
       itemData.system.prepared = prepared;
       if (ability) itemData.system.ability = ability;
       if (uses && (Number(itemData.system.level) || 0) > 0) {
-        itemData.system.uses = { ...(itemData.system.uses ?? {}), max: "1", recovery: [{ period: "lr", type: "recoverAll" }] };
+        itemData.system.uses = { ...(itemData.system.uses ?? {}), max: "1", recovery: [{ period: recovery, type: "recoverAll" }] };
       }
       itemData.flags ??= {};
       itemData.flags[GRANT_SCOPE] = { ...(itemData.flags[GRANT_SCOPE] ?? {}), grant };
@@ -202,7 +202,7 @@ function featSteps(clone, actor) {
           if (!wanted.length) return;
           const found = await findEntries(e => e.type === "spell" && wanted.includes(slug(e.system, e.name)));
           const uuids = wanted.map(key => found.find(s => slug(s.system, s.name) === key)?.uuid).filter(Boolean);
-          await grantSpells(clone, uuids, { sourceItem, grant, ability, uses: true });
+          await grantSpells(clone, uuids, { sourceItem, grant, ability, uses: true, recovery: rule.recovery ?? "lr" });
         } });
     }
     if (rule.cantrips) {
@@ -213,7 +213,7 @@ function featSteps(clone, actor) {
     if (rule.spells) {
       steps.push(choiceStep({ key: `featspells|${identifier}|spells`, title: tr("FeatSpells.Spells", "{feat}: level 1 spell", { feat: feat.name }), item: feat.name, level: 0,
         count: rule.spells, load: () => fromList(1, 1),
-        apply: picks => grantSpells(clone, picks, { sourceItem, grant, ability, uses: true }) }));
+        apply: picks => grantSpells(clone, picks, { sourceItem, grant, ability, uses: true, recovery: rule.recovery ?? "lr" }) }));
     }
   }
   return steps;

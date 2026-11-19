@@ -168,8 +168,8 @@ Please report Mobile Deck problems here rather than to VE Mobile.
 
 ## More modules
 
-- **[Encounter Deck](https://github.com/EdenMichal/encounter-deck)**: encounter prep by campaign for D&D 5e, run as real combat with the tokens kept off the map, and a carousel of the fight for the whole table.
-- **[Music Deck](https://github.com/EdenMichal/music-deck)**: two music decks with a crossfader, ambient sound scenes, SFX pads and combat music, played from a redesigned Playlists tab or an Elgato Stream Deck+.
+- **[Encounter Deck](https://github.com/EdenMichal/encounter-deck).** Encounter prep by campaign for D&D 5e. Fights run as real Foundry combat with the monster tokens kept off the map, and a carousel shows the whole table whose turn it is.
+- **[Music Deck](https://github.com/EdenMichal/music-deck).** Two music decks with a crossfader, ambient sound scenes, SFX pads and combat music, played from a redesigned Playlists tab or an Elgato Stream Deck+.
 
 ## License and credits
 

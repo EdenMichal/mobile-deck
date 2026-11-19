@@ -7,7 +7,7 @@
 ![Phone and Tablet](https://img.shields.io/badge/Phone_%26_Tablet-supported-blue)
 [![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-**Your Foundry game, designed for touch.**
+**Play your Foundry game from a phone or tablet.**
 
 Mobile Deck gives **D&D5e** and **Pathfinder Second Edition** a phone and tablet interface. Open your usual Foundry world in a browser and sign in. You can roll, cast spells, manage gear, read journals, follow chat and move tokens. Rolls and actions still go through your game system.
 
@@ -52,7 +52,7 @@ Mobile Deck is a separate module with its own ID, `mobile-deck`. It doesn't read
 | **D&D5e** | Foundry 13 and D&D5e 5.3.2 |
 | **PF2e** | Foundry 14 and PF2e 8.6.1 |
 
-**PF2e requires Foundry v14+.** Other game systems are not currently supported.
+**PF2e needs Foundry v14 or later.** Mobile Deck doesn't support other game systems yet.
 
 ## Devices and support
 
@@ -71,12 +71,7 @@ iPhone and iPad support is best effort. Foundry lists Safari as unsupported, and
 2. Enable **Mobile Deck** in **Manage Modules** and fully reload Foundry.
 3. Open the world on your phone or tablet. Use **Auto-detect** or pick **Phone** or **Tablet** in **Mobile Mode**.
 
-<details>
-<summary>Manual installation</summary>
-
-Extract the ZIP from the [latest release](https://github.com/EdenMichal/mobile-deck/releases/latest) into `Data/modules/mobile-deck`. Put `module.json` directly in that folder, beside `src`, `assets` and `locales`, then reload Foundry.
-
-</details>
+Foundry's **Check for Updates** finds new versions through the same URL.
 
 ## Install as an app (PWA)
 
@@ -115,7 +110,7 @@ Use **Native configuration & edit** when you need the standard Foundry sheet.
 - Manage prepared spells and cast from your sheet, including supported rituals, scrolls and wands.
 - Use the Crafting tab for formulas, crafting checks and supported alchemy. The Pathfinder Society tab covers character details, factions, reputation and boons.
 
-The actor chooser lists player characters. Character creation, advancement, Society reporting and full staff preparation and charges are outside the current scope. Specialist class and third-party mechanics vary.
+The actor chooser lists player characters. Mobile Deck doesn't cover PF2e character creation, advancement, Society reporting, or full staff preparation and charges yet. Some specialist class features and third-party mechanics may not work.
 
 ## Controls and shortcuts
 
@@ -135,7 +130,7 @@ Turn on **Return to Scene after actions** if you want supported actions to bring
 
 - **Chat** keeps your system's roll cards and messages, with an unread badge that clears when you reach the newest message.
 - **Journals** show folders and pages. Pinch to change text size, or open an image to zoom in.
-- **My Journals** (players) sit above the Library, one row per character. Tap **New** for a folder or journal, **Add page** for a text or picture page, and **⋯** on any row to rename, move, reorder or delete it. Pages save as you type. New folders, journals and pictures need a GM online; writing doesn't. Privacy works like any Foundry journal: other players can't open these notes in Foundry or Mobile Deck, but Foundry sends every journal to every connected browser, so someone using the browser's developer tools could still read them.
+- **My Journals** (players) sit above the Library, one row per character. Tap **New** for a folder or journal, **Add page** for a text or picture page, and **⋯** on any row to rename, move, reorder or delete it. Pages save as you type. New folders, journals and pictures need a GM online; writing doesn't. Privacy works as it does for any Foundry journal. Other players can't open these notes in Foundry or Mobile Deck. Foundry still sends every journal to every connected browser, though, so someone using the browser's developer tools could read them.
 - **Combat** shows the turn order and the controls your role allows. The optional carousel keeps the order and **End Turn** on the map.
 
 ## Appearance and performance
@@ -175,8 +170,8 @@ Please report Mobile Deck problems here rather than to VE Mobile.
 
 Mobile Deck's code is under the [MIT Licence](LICENSE). It is based on [VE Mobile](https://github.com/Silvestrae/ve-mobile), © 2026 Silvestrae, also under the MIT Licence. If you enjoy the interface, you can [support Silvestrae on Ko-fi](https://ko-fi.com/silvestrae).
 
-The bundled Work Sans font (`assets/fonts`) is © 2019 The Work Sans Project Authors and is licensed under the [SIL Open Font License 1.1](https://openfontlicense.org).
+The bundled Work Sans font (`assets/fonts`) is © 2019 The Work Sans Project Authors, under the [SIL Open Font License 1.1](https://openfontlicense.org).
 
-I use AI tools to assist with writing code, documentation and testing. [Foundry VTT AI Content Policy](https://foundryvtt.com/article/ai-policy/)
+I use AI tools to help with code, documentation and testing. [Foundry VTT AI Content Policy](https://foundryvtt.com/article/ai-policy/)
 
 Mobile Deck is independent of Foundry Gaming LLC, Wizards of the Coast and Paizo.

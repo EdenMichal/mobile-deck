@@ -42,6 +42,7 @@ Mobile Deck is a separate module with its own ID, `mobile-deck`. It doesn't read
 - [Localisation](#localisation)
 - [Troubleshooting](#troubleshooting)
 - [Feedback and support](#feedback-and-support)
+- [More modules](#more-modules)
 - [License and credits](#license-and-credits)
 
 ## Compatibility
@@ -164,6 +165,11 @@ Mobile Deck ships with **US English, Australian English and Russian**. Thanks to
 If something breaks, describe what you did, what you expected and what happened. Include your device, browser, Foundry, system and Mobile Deck versions, plus any relevant modules. [Report a bug or suggest a feature](https://github.com/EdenMichal/mobile-deck/issues).
 
 Please report Mobile Deck problems here rather than to VE Mobile.
+
+## More modules
+
+- **[Encounter Deck](https://github.com/EdenMichal/encounter-deck)**: encounter prep by campaign for D&D 5e, run as real combat with the tokens kept off the map, and a carousel of the fight for the whole table.
+- **[Music Deck](https://github.com/EdenMichal/music-deck)**: two music decks with a crossfader, ambient sound scenes, SFX pads and combat music, played from a redesigned Playlists tab or an Elgato Stream Deck+.
 
 ## License and credits
 

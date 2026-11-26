@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Mobile Deck 1.3.0
 
 - **Side by Side on tablets.** A **Side by Side** button on the tablet rail keeps your character sheet next to Chat, Journals or Combat in landscape. Tap any of the three to change what sits beside the sheet. Scene and Settings still open full width. Turning it on turns Split Screen off, and it works when the map isn't available.
 - **Landscape character sheet.** In Tablet Full, the D&D5e and PF2e sheets keep a stats column on the left with the portrait, hit points, Armor Class, abilities or attributes, saves and skills. The tabs scroll on the right, and the first tab no longer repeats what the column shows.

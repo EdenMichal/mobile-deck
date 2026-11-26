@@ -747,6 +747,7 @@
         "PleaseSelectACharacter": "Please select a character",
         "NoSupportedCharactersAreAvailableToThisUser": "No supported characters are available to this user.",
         "CharacterSheetSections": "Character sheet sections",
+        "CharacterStats": "Character stats",
         "SelectCharacterCurrentCharacter": "Select character. Current character: {name}",
         "Stabilised": "Stabilized",
         "Dead": "Dead",
@@ -1474,7 +1475,8 @@
         "DesktopReview": "You are reviewing mobile controls from Desktop. Mobile Mode in Foundry settings enables or selects the Phone or Tablet presentation for this browser and reloads Foundry.",
         "Phone": "Phone shows one screen at a time. Actor placement uses a staged preview with Place and Cancel.",
         "TabletSplit": "Tablet Split shows content beside the Scene in landscape. Use the side control to move the dock. Split portrait drops create tokens directly; native action previews still use Place and Cancel.",
-        "TabletFull": "Tablet Full shows the selected screen across the available space. Use Split Screen to return to side-by-side content when landscape and the live map are available.",
+        "TabletSideBySide": "Side by Side keeps the character sheet beside Chat, Journals or Combat in landscape, and works without the live map. Tap Chat, Journals or Combat to change the screen beside the sheet; Scene and Settings use the whole width until you return. Sheet editors and results cover only the sheet.",
+        "TabletFull": "Tablet Full shows the selected screen across the available space. Use Split Screen to show the live map beside it, or Side by Side to keep the character sheet beside Chat, Journals or Combat, when the tablet is in landscape.",
         "ScenePause": "Double-tap the Scene navigation tab to pause or unpause the game. Only users with GM permission can do this. The paused notice and alternating Scene/pause icon are visible to everyone."
       },
       "Settings": {
@@ -1917,6 +1919,9 @@
         "ScenePanel": "Scene panel",
         "Primary": "Primary",
         "SplitScreen": "Split Screen",
+        "SideBySide": "Side by Side",
+        "SideBySideHint": "Keep the character sheet beside Chat, Journals or Combat",
+        "CompanionPane": "{screen} beside the character sheet",
         "MoveNavigationToLeftSide": "Move navigation to left side",
         "Ms": "— ms",
         "FPS": "— FPS",

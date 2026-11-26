@@ -85,9 +85,10 @@ On iPhone or iPad, use **Share > Add to Home Screen** in Safari. Your Foundry se
 | --- | --- |
 | **Phone** | One pane at a time, with navigation along the bottom. |
 | **Tablet Split** | The live map beside your sheet, chat or journal. |
-| **Tablet Full** | One wide pane with navigation along the side. |
+| **Tablet Side by Side** | Your sheet beside chat, journals or combat. |
+| **Tablet Full** | One wide pane with navigation along the side. In landscape, the sheet keeps your portrait, hit points, abilities and skills in a column on the left. |
 
-Use **Split Screen** to switch between the two tablet layouts.
+In landscape, **Split Screen** and **Side by Side** turn their layouts on and off. With both off, you get Tablet Full.
 
 ## Dungeons & Dragons Fifth Edition
 

@@ -1,3 +1,5 @@
+import { routeVisible } from "../kernel/tablet-layout.mjs";
+
 const ROUTE_HISTORY_LIMIT = 16;
 
 /**
@@ -47,7 +49,7 @@ export function createVeBackDispatcher({
     ];
 
     if (state.sceneChooserOpen) return ["scene-chooser", () => commands.closeSceneChooser?.()];
-    if (state.route === "journals" && state.journal) return ["journal-detail", () => commands.closeJournal?.()];
+    if (state.journal && routeVisible(state, "journals")) return ["journal-detail", () => commands.closeJournal?.()];
     if (state.route === "characters" && state.characterNavigation?.length) return ["actor-origin", () => commands.returnToActorOrigin?.()];
     if (state.route !== "characters") return ["character-home", () => commands.returnToCharacter?.()];
     if (characterHomeBackTarget(state)) return ["character-overview", () => commands.selectCharacterTab?.(characterBackTab(state))];

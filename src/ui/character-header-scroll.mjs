@@ -6,7 +6,8 @@ export function bindCharacterHeaderScroll({ scroller, screen, scope }) {
   if (scope.disposed) return null;
   const heading = screen.querySelector(".ve-character-heading");
   const root = screen.closest(".ve-mobile-app");
-  if (!heading || !(root?.dataset.formFactor === "phone" || root?.dataset.splitScreen === "true")) return null;
+  // The compact, collapsing header belongs to every narrow sheet pane: phone, map Split and Side by side.
+  if (!heading || !(root?.dataset.formFactor === "phone" || root?.dataset.splitScreen === "true" || root?.dataset.sheetCompanion === "true")) return null;
   // Integrations may provide a static header. Only morph a header that exposes
   // the complete compact-vitals layout contract. Do not allocate observers or
   // measure system-specific markup when that optional layout is absent.

@@ -183,14 +183,15 @@ export function mountChatVisualViewport({ host, input, document, scope }) {
   const reconcile = () => {
     if (disposed || scope.disposed || host.isConnected === false) return;
     const currentRoot = host.closest?.(".ve-mobile-app");
-    if (!currentRoot || currentRoot.dataset?.route !== "chat") return;
+    const presentation = chatPresentation(currentRoot);
+    if (!presentation) return;
     if (observedRoot !== currentRoot && typeof browser.MutationObserver === "function") {
       rootObserver ??= new browser.MutationObserver(update);
       rootObserver.disconnect();
-      rootObserver.observe(currentRoot, { attributes: true, attributeFilter: ["data-route", "data-split-screen", "data-form-factor"] });
+      rootObserver.observe(currentRoot, { attributes: true, attributeFilter: ["data-route", "data-split-screen", "data-companion-route", "data-form-factor"] });
       observedRoot = currentRoot;
     }
-    if (currentRoot.dataset?.splitScreen === "true") {
+    if (presentation === "pane") {
       // The Scene and navigation keep their layout; only a focused composer
       // needs its own pane clipped to the keyboard's visible bottom edge.
       restore();
@@ -250,6 +251,14 @@ export function mountChatVisualViewport({ host, input, document, scope }) {
     restore();
   });
   queueMicrotask(update);
+}
+
+/** Name how VE shows Chat: "full" owns the whole frame, "pane" shares it with the map
+ * (Split Screen) or the pinned sheet (Side by side), and "" means Chat is not on screen. */
+export function chatPresentation(root) {
+  const data = root?.dataset;
+  if (data?.route === "chat") return data.splitScreen === "true" ? "pane" : "full";
+  return data?.companionRoute === "chat" ? "pane" : "";
 }
 
 /** Read visible viewport bounds with layout-viewport fallbacks for keyboard pan. */

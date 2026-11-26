@@ -1,3 +1,4 @@
+import { routeVisible } from "../kernel/tablet-layout.mjs";
 import { characterHomeBackTarget } from "./ve-back-dispatcher.mjs";
 
 /**
@@ -87,7 +88,7 @@ export function veCloseWatcherLayers(state = {}, { splitActive = false, nativeLa
   if (characterHomeBackTarget(state)) layers.push("character-overview");
   if (splitActive) layers.push("split-pane");
   if (state.sceneChooserOpen) layers.push("scene-chooser");
-  if (state.route === "journals" && state.journal) layers.push(`journal:${state.journal.id ?? "open"}`);
+  if (state.journal && routeVisible(state, "journals")) layers.push(`journal:${state.journal.id ?? "open"}`);
   if (state.journalMenuOpen) layers.push("journal-page-menu");
   if (state.characterItemId) layers.push(`item:${state.characterItemId}`);
   if (state.journalImage) layers.push(`journal-image:${state.journalImage.src}`);

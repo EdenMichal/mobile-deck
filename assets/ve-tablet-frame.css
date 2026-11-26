@@ -1,0 +1,336 @@
+/* Tablet layout styles. Loaded after ve-mobile.css and pf2e.css.
+ *
+ * Side by side (landscape tablets): the Character sheet stays in .ve-viewport
+ * on the left and Chat, Journals or Combat sit in .ve-companion-viewport on its
+ * right, whichever side the rail is on. The frame sets
+ * data-sheet-companion="true" only while that pair is on screen; Scene and
+ * Settings take the full width with data-sheet-companion="false". The sheet's
+ * narrow presentation and its pane overlays come from the map Split rules in
+ * ve-mobile.css, which match both layouts.
+ */
+
+.ve-tablet-layout-toggles,
+.ve-companion-viewport {
+  display: none !important;
+}
+
+/* Rail: Split Screen and Side by Side share the first row of the landscape rail. */
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-tablet-layout-toggles {
+  grid-row: 1;
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-tablet-layout-toggles > .ve-split-screen-toggle {
+  grid-row: 1;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-sheet-companion-toggle {
+  grid-row: 2;
+  position: relative;
+  margin: 0 var(--ve-tablet-nav-inset);
+  width: auto;
+  min-height: 64px;
+  padding: 7px 3px;
+  display: grid !important;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid color-mix(in srgb, var(--ve-red-bright) 72%, var(--ve-border));
+  border-radius: 11px;
+  color: var(--ve-red-bright);
+  background: color-mix(in srgb, var(--ve-surface-up) 84%, var(--ve-red) 16%);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--ve-red-bright) 18%, transparent);
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-sheet-companion-toggle i {
+  font-size: 1.15rem;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-sheet-companion-toggle span {
+  max-width: 100%;
+  font-size: 0.6rem;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-sheet-companion-toggle.is-active {
+  border-color: var(--ve-red-bright);
+  color: white;
+  background: var(--ve-red);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ve-red-bright) 22%, transparent), 0 8px 20px rgb(0 0 0 / 0.28);
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"] .ve-sheet-companion-toggle:disabled {
+  opacity: 0.5;
+}
+
+.ve-mobile-app[data-character-theme="custom"] .ve-sheet-companion-toggle.is-active {
+  color: var(--ve-custom-accent-text) !important;
+  background: var(--ve-custom-accent) !important;
+}
+
+/* The companion screen's rail item: current, with a quieter mark than the pinned sheet. */
+.ve-mobile-app[data-sheet-companion="true"] .ve-main-nav-item.is-companion {
+  outline: 2px solid color-mix(in srgb, var(--ve-red-bright) 55%, transparent);
+  outline-offset: -2px;
+}
+
+/* Frame: [sheet | companion | rail], or [rail | sheet | companion] with the rail on the left.
+ * The sheet takes about 56% of the space beside the rail; each pane keeps a usable minimum. */
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"][data-sheet-companion="true"] {
+  --ve-companion-sheet-width: clamp(360px, calc((100% - var(--ve-tablet-nav-width)) * 0.56), calc(100% - var(--ve-tablet-nav-width) - 320px));
+  grid-template-columns: var(--ve-companion-sheet-width) minmax(0, 1fr) var(--ve-tablet-nav-width);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="landscape"][data-sheet-companion="true"][data-nav-side="left"] {
+  grid-template-columns: var(--ve-tablet-nav-width) var(--ve-companion-sheet-width) minmax(0, 1fr);
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"] .ve-companion-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: block !important;
+  grid-column: 2;
+  grid-row: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  container-type: inline-size;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"][data-nav-side="left"] .ve-companion-viewport {
+  grid-column: 3;
+}
+
+.ve-companion-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.ve-companion-viewport > section {
+  width: min(100%, 860px);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: 18px 16px 32px;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"] .ve-viewport {
+  position: relative;
+  z-index: 2;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  width: 100%;
+  overflow-x: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--ve-red-bright) 36%, var(--ve-border));
+  border-left: 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ve-red) 12%, var(--ve-bg)), var(--ve-bg) 58%),
+    var(--ve-bg);
+  box-shadow: 10px 0 26px rgb(0 0 0 / 0.22);
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"][data-nav-side="left"] .ve-viewport {
+  grid-column: 2;
+}
+
+/* Sheet overlays cover exactly the sheet pane, which is not where map Split puts its panel. */
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"] .ve-panel-overlays {
+  grid-column: 1;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"][data-nav-side="left"] .ve-panel-overlays {
+  grid-column: 2;
+}
+
+.ve-mobile-app[data-theme="light"][data-form-factor="tablet"][data-sheet-companion="true"] .ve-viewport {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ve-red) 22%, var(--ve-bg)), var(--ve-bg) 58%),
+    var(--ve-bg);
+}
+
+/* The shared pane-overlay rule also matches the Split-only Scene action layer; it has no place in the pair. */
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"] .ve-scene-action-overlays {
+  display: none !important;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"] .ve-bottom-nav {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-sheet-companion="true"][data-nav-side="left"] .ve-bottom-nav {
+  grid-column: 1;
+}
+
+/* Chat beside the sheet: Foundry's live log fills the pane; a focused composer is clipped above the keyboard. */
+.ve-mobile-app[data-companion-route="chat"] .ve-companion-viewport {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.ve-mobile-app[data-companion-route="chat"] .ve-companion-viewport > .ve-native-chat-screen {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ve-mobile-app[data-companion-route="chat"] .ve-companion-viewport > .ve-native-chat-screen.ve-chat-visual-pane {
+  height: var(--ve-chat-pane-height);
+  max-height: 100%;
+  min-height: 0;
+}
+
+/* An image page owns one bounded row in the companion pane too. */
+.ve-companion-viewport > .ve-journal-reader:has(.ve-journal-image-page) {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+/* GM encounter controls float over the Combat pane, never over the pinned sheet. */
+.ve-mobile-app[data-form-factor="tablet"][data-companion-route="combat"] .ve-gm-combat-control-host {
+  inset-inline-start: calc(var(--ve-safe-left) + var(--ve-companion-sheet-width) + 8px);
+  inset-inline-end: calc(var(--ve-safe-right) + var(--ve-tablet-nav-width) + 8px);
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-companion-route="combat"][data-nav-side="left"] .ve-gm-combat-control-host {
+  inset-inline-start: calc(var(--ve-safe-left) + var(--ve-tablet-nav-width) + var(--ve-companion-sheet-width) + 8px);
+  inset-inline-end: calc(var(--ve-safe-right) + 8px);
+}
+
+.ve-mobile-app[data-companion-route="combat"][data-gm-combat-controls="true"] .ve-companion-viewport .ve-combat-screen {
+  padding-bottom: calc(var(--ve-gm-combat-row-reservation, 72px) + var(--ve-safe-bottom));
+}
+
+/* Portrait tablets: give the non-sheet screens readable widths and use spare width for lists. */
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-journal-rich-text {
+  max-width: min(100%, 72ch);
+  margin-inline: auto;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-journal-page {
+  padding: 18px 22px;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-viewport > .ve-settings {
+  max-width: 720px;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-combat-screen {
+  padding-inline: 18px;
+}
+
+.ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-scene-chooser {
+  width: min(680px, 100%);
+  max-height: min(78vh, 920px);
+}
+
+@container (min-width: 640px) {
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] :is(.ve-journal-tree, .ve-journal-folder-contents) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] :is(.ve-journal-tree, .ve-journal-folder-contents) > .ve-journal-folder {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Mirror the style-authority layer, whose important declarations would otherwise
+ * keep the two-column tablet grid and phone-width sections in Side by side. */
+@layer ve-mobile-style-authority {
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="landscape"][data-sheet-companion="true"] {
+    grid-template-columns: var(--ve-companion-sheet-width) minmax(0, 1fr) var(--ve-tablet-nav-width) !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="landscape"][data-sheet-companion="true"][data-nav-side="left"] {
+    grid-template-columns: var(--ve-tablet-nav-width) var(--ve-companion-sheet-width) minmax(0, 1fr) !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-sheet-companion="true"] .ve-bottom-nav {
+    grid-column: 3 !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-sheet-companion="true"][data-nav-side="left"] .ve-bottom-nav {
+    grid-column: 1 !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority] .ve-companion-viewport > section {
+    box-sizing: border-box !important;
+    width: min(100%, 860px) !important;
+    min-height: 100% !important;
+    margin-inline: auto !important;
+    padding: 18px 16px 32px !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-companion-route="chat"] .ve-companion-viewport > .ve-native-chat-screen {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-companion-route="chat"] .ve-companion-viewport > .ve-native-chat-screen.ve-chat-visual-pane {
+    height: var(--ve-chat-pane-height) !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-sheet-companion="true"] .ve-viewport > .ve-character-screen {
+    padding-top: 0 !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-sheet-companion="true"] .ve-sheet-tabs {
+    grid-template-columns: none !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(64px, max-content) !important;
+    justify-content: start !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-sheet-companion="true"] .ve-sheet-tabs button {
+    min-width: 64px !important;
+    min-height: 58px !important;
+    padding-inline: 4px !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="portrait"] .ve-viewport > .ve-settings {
+    max-width: 720px !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="portrait"] .ve-journal-page {
+    padding: 18px 22px !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="portrait"] .ve-journal-rich-text {
+    max-width: min(100%, 72ch) !important;
+    margin-inline: auto !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="portrait"] .ve-viewport > .ve-combat-screen {
+    padding-inline: 18px !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-sheet-companion="true"] .ve-viewport {
+    overflow-x: hidden !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority][data-companion-route="combat"][data-gm-combat-controls="true"] .ve-companion-viewport .ve-combat-screen {
+    padding-bottom: calc(var(--ve-gm-combat-row-reservation, 72px) + var(--ve-safe-bottom)) !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority] .ve-companion-viewport > .ve-journal-reader:has(.ve-journal-image-page) {
+    min-height: 0 !important;
+  }
+}

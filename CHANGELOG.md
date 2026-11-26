@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Side by Side on tablets.** A **Side by Side** button on the tablet rail keeps your character sheet next to Chat, Journals or Combat in landscape. Tap any of the three to change what sits beside the sheet. Scene and Settings still open full width. Turning it on turns Split Screen off, and it works when the map isn't available.
+- **Landscape character sheet.** In Tablet Full, the D&D5e and PF2e sheets keep a stats column on the left with the portrait, hit points, Armor Class, abilities or attributes, saves and skills. The tabs scroll on the right, and the first tab no longer repeats what the column shows.
+- **Portrait tablets.** Sheets put all six abilities in one row and lay skills out in columns. Journals cap their line length and list entries in two columns. Settings no longer stretches across the whole screen.
+
 ## Mobile Deck 1.2.2
 
 - **Change choices.** Players can change a character's earlier choices from the Level Up screen. They can redo any level's picks (skills, feats or ability increases, subclass, hit points, fighting styles and more), change the base ability scores, swap the species, background or a class, or drop a multiclass. Later choices are kept where they still fit, and Review lists anything to check. Spells and starting equipment stay as they are. With level-up approval on, a player's change goes to the GM like a level-up, and every change shows in Change history.

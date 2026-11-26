@@ -23,6 +23,8 @@ import { resolveCharacterTheme } from "../../../../kernel/character-theme.mjs";
 import { resolvePf2eHeaderBanner } from "../../../../kernel/pf2e-class-appearance.mjs";
 import { DEFAULT_HEADER_ARTWORK } from "../../../../kernel/header-banner.mjs";
 import { applyBannerArtwork } from "../../../../ui/header-banner-artwork.mjs";
+import { arrangeCharacterSheetShell, characterSheetLayout, sheetPageForLayout, sheetTabsForLayout, SHEET_LAYOUT_STANDARD, SHEET_LAYOUT_WIDE, watchCharacterSheetLayout } from "../../sheet-layout.mjs";
+import { pf2eOverviewSections, pf2eProficiencySections, pf2eRailPages, pf2eRailTabs, pf2eStatsRailSections, pf2eSupplementaryProficiencies } from "./sheet-sections.mjs";
 
 const TABS = Object.freeze([
   ["overview", "fa-address-card", "Character", "PF2E.TabCharacterLabel"],
@@ -98,6 +100,10 @@ export function renderPf2eCharacters({ state, commands, scope, overlayHost = nul
   shell.actorSourceUuid = actor?.sourceUuid ?? "";
   shell.actor = actor;
   shell.commands = commands;
+  shell.lastState = state;
+  shell.lastCommands = commands;
+  // Tablet landscape with the whole pane: a fixed stats column beside the tabs.
+  const layout = characterSheetLayout(state, actor);
   // Scope convenience commands to this Actor generation before child presenters use them.
   commands = Object.create(commands, {
     pf2eActionCurrent: { value: source => !ownerScope.disposed && shell.actorSourceUuid === source },
@@ -126,15 +132,15 @@ export function renderPf2eCharacters({ state, commands, scope, overlayHost = nul
   syncHeaderEditor(shell, resultsDeferred);
   syncItemDetails(shell, resultsDeferred);
   const ownActionSession = Boolean(state?.actionSession && state.actionSessionOrigin !== "scene" && !resultsDeferred);
-  screen.className = `ve-character-screen ve-character-shared-shell ve-pf2e-character-screen${state?.rollResult && !resultsDeferred ? " has-roll-result" : ""}${ownActionSession ? " has-action-session" : ""}`;
+  screen.className = `ve-character-screen ve-character-shared-shell ve-pf2e-character-screen${shell.layout === SHEET_LAYOUT_WIDE ? " ve-sheet-wide" : ""}${state?.rollResult && !resultsDeferred ? " has-roll-result" : ""}${ownActionSession ? " has-action-session" : ""}`;
   screen.dataset.characterTheme = resolveCharacterTheme(actor?.themeClassKey ?? "neutral", commands.readCharacterPreferences?.()?.colorScheme);
   screen.dataset.actorType = actor?.type ?? "";
   if (actor) {
-    const tab = presentationTab(state.characterTab);
+    // A tab whose whole content sits in the stats column shows Character instead; state.characterTab is kept.
+    const tab = sheetPageForLayout(presentationTab(state.characterTab), layout, pf2eRailPages(actor));
     screen.dataset.pf2eView = tab;
-    const visibleTabs = TABS;
-    const panelKey = ["abilities", "effects"].includes(state.characterTab) ? state.characterTab : tab;
-    const context = `${actor.sourceUuid ?? actor.id}:${panelKey}`;
+    const visibleTabs = sheetTabsForLayout(TABS, layout, pf2eRailTabs(actor));
+    const context = `${actor.sourceUuid ?? actor.id}:${tab}`;
     // Native updates rebuild command closures, but an open description must not
     // disappear while its refreshed enriched HTML is being fetched.
     const descriptions = new Map();
@@ -148,11 +154,16 @@ export function renderPf2eCharacters({ state, commands, scope, overlayHost = nul
     // Reconcile the shared header and tabs before replacing this generation's pane.
     syncHeader(shell, { actor, actors, commands, ownerScope, overlayHost });
     syncTabs(shell, visibleTabs, tab, commands, ownerScope);
+    // A window resize across the wide threshold switches standard <-> wide on this retained screen; the
+    // header, tab bar and scroller move between the heading and the two columns rather than being rebuilt.
+    // Toggling Split or Side by side changes the frame's layout key, which mounts a new shell instead.
+    arrangeCharacterSheetShell(shell, layout, { localize: commands.localize });
+    updateStatsRail(shell, { actor, commands, ownerScope, layout });
     shell.paneScope?.dispose();
     const paneScopeNow = ownerScope.child("pf2e-character-pane");
     shell.paneScope = paneScopeNow;
     shell.activePanelContext = context;
-    const panel = renderTab(tab, actor, state, commands, paneScopeNow, shell, ownerScope);
+    const panel = renderTab(tab, actor, state, commands, paneScopeNow, shell, ownerScope, layout);
     if (["features", "spells"].includes(tab)) {
       prepareListSorting(panel);
       listControls(panel, commands, paneScopeNow, { label: text(commands, TABS.find(([key]) => key === tab)[2], TABS.find(([key]) => key === tab)[3]), stateKey: `${tab}-sort` });
@@ -167,6 +178,9 @@ export function renderPf2eCharacters({ state, commands, scope, overlayHost = nul
     bindPf2eShortcutIcons(screen, actor, commands, paneScopeNow);
   } else {
     if (shell.menuController) setActorMenuOpen(shell, false, ownerScope);
+    // The chooser notice always uses the standard heading.
+    if (shell.layout === SHEET_LAYOUT_WIDE) arrangeCharacterSheetShell(shell, SHEET_LAYOUT_STANDARD, { localize: commands.localize });
+    updateStatsRail(shell, { actor, commands, ownerScope, layout: SHEET_LAYOUT_STANDARD });
     shell.paneScope?.dispose();
     const paneScopeNow = ownerScope.child("pf2e-character-pane");
     shell.paneScope = paneScopeNow;
@@ -185,7 +199,51 @@ export function renderPf2eCharacters({ state, commands, scope, overlayHost = nul
   }
   shell.screen = screen;
   screen.__veUpdateCharacter = next => renderPf2eCharacters({ ...next, scope: ownerScope, overlayHost, retained: shell });
+  // A window resize across the wide threshold re-renders this pane with the latest state it was given;
+  // the panel state capture keeps its scroll position. Form factor changes remount the screen.
+  if (state?.formFactor === "tablet") watchCharacterSheetLayout(shell, ownerScope, {
+    overlayHost,
+    readLayout: () => characterSheetLayout(shell.lastState, shell.actor),
+    rerender: () => {
+      try { screen.__veUpdateCharacter({ state: shell.lastState, commands: shell.lastCommands }); }
+      catch (error) { console.error("Mobile Deck | Could not change the Character sheet layout", error); }
+    }
+  });
   return screen;
+}
+
+// Wide tablet layout: rebuild the stats column cards whenever the Actor record changes, so save,
+// attribute and skill changes reach it with the header. Leaving the wide layout releases them.
+function updateStatsRail(shell, { actor, commands, ownerScope, layout }) {
+  if (layout !== SHEET_LAYOUT_WIDE || !actor) {
+    if (!shell.railScope) return;
+    shell.railScope.dispose();
+    shell.railScope = null;
+    shell.railActor = null;
+    shell.railBody?.replaceChildren();
+    return;
+  }
+  if (shell.railScope && shell.railActor === actor) return;
+  shell.railScope?.dispose();
+  const scope = shell.railScope = ownerScope.child("pf2e-stats-rail");
+  const top = shell.rail?.scrollTop ?? 0;
+  shell.railBody.replaceChildren(...statsRailCards(actor, commands, scope));
+  if (shell.rail && top) shell.rail.scrollTop = top;
+  shell.railActor = actor;
+}
+
+// The stats column cards below the identity header: saves beside attributes, skills, then lores.
+function statsRailCards(actor, commands, scope) {
+  const skills = actor.pf2e?.skills ?? [];
+  return pf2eStatsRailSections(actor).map(section => {
+    if (section === "statistics") return node("div", { className: "ve-pf2e-overview ve-pf2e-rail-statistics", children: [overviewStatistics(actor, commands, scope)] });
+    const lore = section === "lores";
+    return node("section", { className: `ve-sheet-card ve-pf2e-proficiency-group ve-pf2e-rail-skills${lore ? " is-lore" : ""}`, children: [
+      lore ? node("header", { className: "ve-sheet-card-heading", children: [icon("fa-book"), node("h3", { text: text(commands, "Lore Skills", "PF2E.LoreSkillsHeader") })] })
+        : sectionHeading(commands, "Skills", "fa-dice-d20"),
+      proficiencySkillRows(skills.filter(skill => Boolean(skill.lore) === lore), actor, commands, scope)
+    ] });
+  });
 }
 
 // Fall back to the overview when restored state names an unavailable PF2e tab.
@@ -366,7 +424,8 @@ function syncHeader(shell, { actor, actors, commands, ownerScope, overlayHost })
     if (resolution.choice === "custom") loadCustomHeaderArtwork(headerRefs.hero, resolution.candidates, shell.bannerScope);
     else loadPf2eBanner(headerRefs.hero, resolution.candidates, shell.bannerScope);
   }
-  if (headerRefs.selector.parentElement !== shell.heading) shell.heading.append(headerRefs.selector);
+  // The wide layout keeps the header in its stats column; arrangeCharacterSheetShell moves it back.
+  if (shell.layout !== SHEET_LAYOUT_WIDE && headerRefs.selector.parentElement !== shell.heading) shell.heading.append(headerRefs.selector);
 }
 
 // Mount or dispose the lazy Actor menu and restore its requested expanded folders.
@@ -424,7 +483,7 @@ function syncTabs(shell, visibleTabs, selectedTab, commands, ownerScope) {
     if (active) revealSelectedTab(shell.tabBar, button);
   }
   shell.lastSelectedTab = selectedTab;
-  if (shell.tabBar.parentElement !== shell.heading) shell.heading.append(shell.tabBar);
+  if (shell.layout !== SHEET_LAYOUT_WIDE && shell.tabBar.parentElement !== shell.heading) shell.heading.append(shell.tabBar);
   shell.tabRevealScope?.dispose();
   const tabBar = shell.tabBar;
   const view = tabBar.ownerDocument?.defaultView;
@@ -790,9 +849,9 @@ function actorChoices(actors, commands, scope) {
 }
 
 // Dispatch the selected PF2e tab to its dedicated panel presenter.
-function renderTab(tab, actor, state, commands, scope, shell, ownerScope) {
+function renderTab(tab, actor, state, commands, scope, shell, ownerScope, layout = SHEET_LAYOUT_STANDARD) {
   const pf2e = actor.pf2e ?? {};
-  if (tab === "abilities") return statisticsPanel(actor, commands, scope, shell);
+  if (tab === "abilities") return statisticsPanel(actor, commands, scope, shell, layout);
   if (tab === "effects") return effectsPanel(actor, commands, scope, shell);
   if (tab === "inventory") return inventoryPanel(actor, commands, scope, shell);
   if (tab === "crafting") return renderCraftingPanel({ actor, commands, scope, shell });
@@ -801,13 +860,14 @@ function renderTab(tab, actor, state, commands, scope, shell, ownerScope) {
   if (tab === "features") return actionsPanel(actor, commands, scope, shell);
   if (tab === "feats") return featsPanel(actor, commands, scope, shell);
   if (tab === "biography") return morePanel(actor, pf2e.biography, commands, scope, shell);
-  return overviewPanel(actor, commands, scope, shell);
+  return overviewPanel(actor, commands, scope, shell, layout);
 }
 
 // Compose the compact overview from vital, strike, resource, and statistic sections.
-function overviewPanel(actor, commands, scope, shell) {
+// The wide tablet layout leaves out the saves and attributes its stats column already shows.
+function overviewPanel(actor, commands, scope, shell, layout = SHEET_LAYOUT_STANDARD) {
   const pf2e = actor.pf2e ?? {};
-  const defenses = node("section", { className: "ve-sheet-card ve-pf2e-overview-defenses", children: [
+  const defenses = () => node("section", { className: "ve-sheet-card ve-pf2e-overview-defenses", children: [
     node("header", { className: "ve-pf2e-defense-heading", children: [overviewGlyph("fortitude"), node("h3", { text: text(commands, "Defenses", "VEMOBILE.PF2E.Character.OverviewDefenses") })] }),
     ...["immunities", "weaknesses", "resistances"].map(category => {
       const label = supplement(commands, category[0].toUpperCase() + category.slice(1), category[0].toUpperCase() + category.slice(1));
@@ -818,34 +878,48 @@ function overviewPanel(actor, commands, scope, shell) {
     }),
     pf2e.shield ? shieldSummary(pf2e.shield, commands) : null
   ] });
-  return node("div", { className: "ve-pf2e-overview", children: [
-    node("div", { className: "ve-pf2e-overview-stats", children: [
-      savingThrows(pf2e.saves ?? [], actor, commands, scope),
-      pf2e.attributes?.length ? attributesPanel(pf2e.attributes, commands) : null
-    ] }),
+  const sections = {
+    statistics: () => overviewStatistics(actor, commands, scope),
     defenses,
-    characterDetails(actor, commands, scope),
-    node("div", { className: "ve-pf2e-character-tools", children: [
+    details: () => characterDetails(actor, commands, scope),
+    tools: () => node("div", { className: "ve-pf2e-character-tools", children: [
       restControl(actor, commands, scope)
     ] })
+  };
+  return node("div", { className: "ve-pf2e-overview", children: pf2eOverviewSections(layout).map(key => sections[key]()) });
+}
+
+// Saving throws beside the attribute grid, shared by the overview and the wide stats column.
+function overviewStatistics(actor, commands, scope) {
+  const pf2e = actor.pf2e ?? {};
+  return node("div", { className: "ve-pf2e-overview-stats", children: [
+    savingThrows(pf2e.saves ?? [], actor, commands, scope),
+    pf2e.attributes?.length ? attributesPanel(pf2e.attributes, commands) : null
   ] });
 }
 
 // Group skills and proficiencies while retaining roll controls for permitted checks.
-function statisticsPanel(actor, commands, scope, shell = null) {
+// The wide tablet layout leaves out the skills its stats column already shows.
+function statisticsPanel(actor, commands, scope, shell = null, layout = SHEET_LAYOUT_STANDARD) {
   const skills = actor.pf2e?.skills ?? [];
   // Render a proficiency group only when it contains entries.
   const group = (label, key, entries) => entries.length ? collectionGroup({ key: `proficiency:${key}`, label: text(commands, label, key), glyph: "fa-dice-d20", className: "ve-pf2e-proficiency-group", children: [
-    node("div", { className: "ve-pf2e-proficiency-skills", children: entries.map(skill => node("div", { className: "ve-pf2e-proficiency-skill", children: [
-      skillRoll(skill, actor, commands, scope, true),
-
-    ] })) })
+    proficiencySkillRows(entries, actor, commands, scope)
   ] }) : null;
-  return node("div", { className: "ve-pf2e-statistics", children: [
-    group("Core Skills", "PF2E.CoreSkillsHeader", skills.filter(skill => !skill.lore)),
-    group("Lore Skills", "PF2E.LoreSkillsHeader", skills.filter(skill => skill.lore)),
-    supplementaryProficiencies(actor, commands)
-  ] });
+  const sections = {
+    skills: () => group("Core Skills", "PF2E.CoreSkillsHeader", skills.filter(skill => !skill.lore)),
+    lores: () => group("Lore Skills", "PF2E.LoreSkillsHeader", skills.filter(skill => skill.lore)),
+    // Alone on the wide page, the weapon, armour and class DC groups start open.
+    proficiencies: () => supplementaryProficiencies(actor, commands, layout === SHEET_LAYOUT_WIDE)
+  };
+  return node("div", { className: "ve-pf2e-statistics", children: pf2eProficiencySections(layout).map(key => sections[key]()) });
+}
+
+// One rollable row per skill with its full proficiency rank.
+function proficiencySkillRows(skills, actor, commands, scope) {
+  return node("div", { className: "ve-pf2e-proficiency-skills", children: skills.map(skill => node("div", { className: "ve-pf2e-proficiency-skill", children: [
+    skillRoll(skill, actor, commands, scope, true)
+  ] })) });
 }
 
 // Select the icon used for one PF2e overview section.
@@ -981,13 +1055,13 @@ function characterDetails(actor, commands, scope) {
 }
 
 // Summarize proficiencies without a primary skill or saving-throw row.
-function supplementaryProficiencies(actor, commands) {
-  const rows = actor.pf2e?.details?.proficiencies ?? [];
+function supplementaryProficiencies(actor, commands, open = false) {
+  const rows = pf2eSupplementaryProficiencies(actor);
   return node("div", { className: "ve-pf2e-combat-proficiencies", children: [
     ...[["attacks", "Attacks", "PF2E.Actor.Character.Proficiency.Attack.Title", "fa-swords"], ["defenses", "Defenses", "PF2E.Actor.Character.Proficiency.Defense.Title", "fa-shield"], ["classDCs", "Class DC", "PF2E.Actor.Character.ClassDC.Label", "fa-gear"]].flatMap(([group, label, key, glyph]) => {
-      const entries = rows.filter(row => row.group === group && (group === "classDCs" || row.rank !== 0));
+      const entries = rows.filter(row => row.group === group);
       if (!entries.length) return [];
-      return [collectionGroup({ key: `proficiency:${group}`, label: text(commands, label, key), glyph, className: "ve-pf2e-proficiency-group", children: [
+      return [collectionGroup({ key: `proficiency:${group}`, label: text(commands, label, key), glyph, open, className: "ve-pf2e-proficiency-group", children: [
         node("div", { className: "ve-pf2e-proficiency-readouts", children: entries.map(row => node("div", { className: "ve-pf2e-proficiency-readout", children: [
           node("span", { text: row.label }), rankBadge(commands, row, true), row.value != null ? node("strong", { text: group === "classDCs" ? number(commands, row.value) : modifier(row.value) }) : null
         ] })) })

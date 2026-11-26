@@ -28,6 +28,8 @@ import { sanitizeHtml } from "../../../journals/page-writer.mjs";
 import { shrinkPicture } from "../../../journals/player-journals-layer.mjs";
 import { masteryCard } from "../../../builder/mastery-layer.mjs"; // Player feedback (fork): Weapon Mastery
 import { isBlankHtml } from "../../../../kernel/player-journal-rules.mjs";
+import { arrangeCharacterSheetShell, characterSheetLayout, sheetPageForLayout, SHEET_LAYOUT_STANDARD, SHEET_LAYOUT_WIDE, watchCharacterSheetLayout } from "../../sheet-layout.mjs";
+import { DND5E_RAIL_PAGES, dnd5eOverviewSections, dnd5eStatsRailSections } from "./sheet-sections.mjs";
 
 const SHEET_TABS = Object.freeze([
   ["favourites", "favourites", "Favourites"],
@@ -101,7 +103,10 @@ export function renderCharacters({ state, commands, scope, overlayHost = null, r
   const collectiveTabs = actorSheetTabs(actor.type);
   const favouritesEnabled = !collectiveTabs && settings.characterFavouritesEnabled !== false && settings.characterFavouritesSource !== "off";
   const visibleTabs = collectiveTabs ?? (favouritesEnabled ? SHEET_TABS : SHEET_TABS.filter(([key]) => key !== "favourites"));
-  const activePage = (collectiveTabs ? collectiveTabs.some(([key]) => key === state.characterTab) : SHEET_PAGES.has(state.characterTab) && (state.characterTab !== "favourites" || favouritesEnabled)) ? state.characterTab : "overview";
+  // Tablet landscape with the whole pane: a fixed stats column beside the tabs. Collective Actors keep the standard sheet.
+  const layout = characterSheetLayout(state, actor);
+  const requestedPage = (collectiveTabs ? collectiveTabs.some(([key]) => key === state.characterTab) : SHEET_PAGES.has(state.characterTab) && (state.characterTab !== "favourites" || favouritesEnabled)) ? state.characterTab : "overview";
+  const activePage = sheetPageForLayout(requestedPage, layout, DND5E_RAIL_PAGES);
   // Secondary pages keep their parent tab highlighted; the party page belongs to Inventory.
   const activeTab = ["abilities", "effects"].includes(activePage) ? "overview" : activePage === "party" ? "inventory" : activePage;
   const characterTheme = resolveCharacterTheme(actor.themeClassKey, settings.colorScheme);
@@ -139,7 +144,9 @@ export function renderCharacters({ state, commands, scope, overlayHost = null, r
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   }
-  updateCharacterSharedHeader(shell, { actors, actor, state, commands, settings, ownerScope, overlayHost });
+  updateCharacterSharedHeader(shell, { actors, actor, state, commands, settings, ownerScope, overlayHost, layout });
+  shell.lastState = state;
+  shell.lastCommands = suppliedCommands;
   const panel = node("div", { className: "ve-sheet-panel", children: [collectiveTabs ? renderCollectivePanel(actor, activePage, { commands, scope, state }, {
       inventory: () => inventoryPanel(actor, commands, openItem, state.expandedCharacterItemId, state.characterOpenSections, scope, settings),
       biography: () => biographyPanel(actor, commands, scope),
@@ -151,18 +158,25 @@ export function renderCharacters({ state, commands, scope, overlayHost = null, r
       abilities: () => compactAbilitiesPanel(actor, commands, scope),
       traits: () => traitsPanel(actor, commands.localize),
       effects: owner => effectsPanel(actor, commands, state.characterOpenSections, owner, settings)
-    }) : renderSheetPanel(activePage, actor, commands, openItem, state.expandedCharacterItemId, state.characterOpenSections, scope, settings, shell.spellcastingSelection)] });
-  const screen = shell.screen ??= node("section", {
-    className: "ve-character-screen ve-character-shared-shell",
-    dataset: { characterTheme, actorType: actor.type },
-    children: [actorOriginBack(state, commands, ownerScope), node("div", { className: "ve-character-heading", children: [shell.selector, tabBar] }),
-      node("div", { className: "ve-character-content-scroller", attrs: { tabindex: "0" } })]
-  });
+    }) : renderSheetPanel(activePage, actor, commands, openItem, state.expandedCharacterItemId, state.characterOpenSections, scope, settings, shell.spellcastingSelection, layout)] });
+  if (!shell.screen) {
+    shell.originBack = actorOriginBack(state, commands, ownerScope);
+    shell.scroller = node("div", { className: "ve-character-content-scroller", attrs: { tabindex: "0" } });
+    shell.screen = node("section", {
+      className: "ve-character-screen ve-character-shared-shell",
+      dataset: { characterTheme, actorType: actor.type }
+    });
+  }
+  const screen = shell.screen;
+  // A window resize across the wide threshold switches standard <-> wide on this retained screen; the
+  // selector, tab bar and scroller move between the heading and the two columns rather than being rebuilt.
+  // Toggling Split or Side by side changes the frame's layout key, which mounts a new shell instead.
+  arrangeCharacterSheetShell(shell, layout, { localize: commands.localize });
   screen.classList.toggle("has-roll-result", Boolean(state.rollResult));
   screen.classList.toggle("has-action-session", Boolean(state.actionSession) && !resultsDeferred);
   screen.dataset.characterTheme = characterTheme;
   screen.dataset.actorType = actor.type;
-  const contentHost = screen.querySelector(".ve-character-content-scroller");
+  const contentHost = shell.scroller;
   contentHost.replaceChildren(panel);
   if (!overlayHost) screen.append(...overlays);
   // Refresh only header data on a retained shell when the character pane is reused.
@@ -171,18 +185,84 @@ export function renderCharacters({ state, commands, scope, overlayHost = null, r
     const nextActor = Object.hasOwn(nextState.snapshot ?? {}, "selectedActor")
       ? nextState.snapshot.selectedActor : nextActors.find(entry => entry.id === nextState.selectedActorId);
     if (!nextActor) return false;
+    shell.lastState = nextState;
+    shell.lastCommands = nextCommands;
+    // The layout only changes on a full pane render; the header path refreshes the column in place.
     return updateCharacterSharedHeader(shell, { actors: nextActors, actor: nextActor, state: nextState,
-      commands: nextCommands, settings: nextCommands.readCharacterPreferences(), ownerScope, overlayHost });
+      commands: nextCommands, settings: nextCommands.readCharacterPreferences(), ownerScope, overlayHost, layout: shell.layout });
   };
   screen.__veUpdateCharacter = next => renderCharacters({ ...next, scope: ownerScope, overlayHost, retained: shell });
+  // A window resize across the wide threshold re-renders this pane with the latest state it was given.
+  // Form factor changes remount the screen, so only a tablet screen needs to watch.
+  if (state.formFactor === "tablet") watchCharacterSheetLayout(shell, ownerScope, {
+    overlayHost,
+    readLayout: () => characterSheetLayout(shell.lastState, shell.actor),
+    rerender: () => {
+      const top = shell.scroller.scrollTop;
+      try { screen.__veUpdateCharacter({ state: shell.lastState, commands: shell.lastCommands }); }
+      catch (error) { console.error("Mobile Deck | Could not change the Character sheet layout", error); return; }
+      shell.scroller.scrollTop = top;
+    }
+  });
 
   screen.__veCharacterOverlayHost = overlayHost;
-  if (settings.quickbarEnabled && settings.quickbarSource !== "foundry") bindQuickbarCandidates(screen, actor, commands, scope);
+  // Stats column candidates are bound by the column itself, which can be rebuilt without this pane.
+  if (settings.quickbarEnabled && settings.quickbarSource !== "foundry") bindQuickbarCandidates(screen, actor, commands, scope, { exclude: ".ve-sheet-stats-rail", shared: quickbarSlotState(shell, actor) });
   return screen;
 }
 
-// Rebuild the shared header only when its Actor, directory, or presentation preferences change.
-function updateCharacterSharedHeader(shell, { actors, actor, state, commands, settings, ownerScope, overlayHost }) {
+// Refresh the shared identity header and, in the wide layout, the stats column cards that follow it.
+function updateCharacterSharedHeader(shell, { actors, actor, state, commands, settings, ownerScope, overlayHost, layout = SHEET_LAYOUT_STANDARD }) {
+  const headerChanged = updateCharacterIdentityHeader(shell, { actors, actor, state, commands, settings, ownerScope, overlayHost });
+  return updateCharacterStatsRail(shell, { actor, commands, settings, ownerScope, layout, force: headerChanged }) || headerChanged;
+}
+
+// Wide tablet layout: rebuild the stats column cards with the identity header, so HP, ability and
+// skill changes reach it on the header-only path too. Leaving the wide layout releases them.
+function updateCharacterStatsRail(shell, { actor, commands, settings, ownerScope, layout, force }) {
+  if (layout !== SHEET_LAYOUT_WIDE) {
+    if (!shell.railScope) return false;
+    shell.railScope.dispose();
+    shell.railScope = null;
+    shell.railActor = null;
+    shell.railBody?.replaceChildren();
+    return true;
+  }
+  // The column binds its own Quickbar long-press, so a Quickbar setting change rebuilds it too.
+  const quickbar = settings.quickbarEnabled && settings.quickbarSource !== "foundry";
+  if (!force && shell.railScope && shell.railActor === actor && shell.railQuickbar === quickbar) return false;
+  shell.railScope?.dispose();
+  const scope = shell.railScope = ownerScope.child("character-stats-rail");
+  shell.railBody ??= node("div", { className: "ve-sheet-stats-rail-body" });
+  shell.railBody.replaceChildren(...statsRailCards(actor, commands, scope));
+  shell.railActor = actor;
+  shell.railQuickbar = quickbar;
+  if (quickbar) bindQuickbarCandidates(() => shell.screen, actor, commands, scope, { root: shell.railBody, shared: quickbarSlotState(shell, actor) });
+  return true;
+}
+
+// The stats column cards below the identity header: abilities with saves, skills, then tools.
+function statsRailCards(actor, commands, scope) {
+  return dnd5eStatsRailSections(actor).map((section) => {
+    if (section === "abilities") {
+      const card = compactAbilitiesPanel(actor, commands, scope);
+      card.classList.add("ve-sheet-rail-abilities");
+      return card;
+    }
+    if (section === "skills") {
+      const card = skillsPanel(actor, commands, scope);
+      card.classList.add("ve-sheet-rail-skills");
+      return card;
+    }
+    return node("section", { className: "ve-sheet-card ve-sheet-rail-tools", children: [
+      sectionHeading(localizedText(commands.localize, "VEMOBILE.Character.Presenter.ToolProficiencies", "Tool Proficiencies"), "fa-screwdriver-wrench"),
+      node("div", { className: "ve-trained-skills-list", children: actor.toolProficiencies.map((tool) => toolProficiencyButton(tool, actor, commands, scope)) })
+    ] });
+  });
+}
+
+// Rebuild the identity header only when its Actor, directory, or presentation preferences change.
+function updateCharacterIdentityHeader(shell, { actors, actor, state, commands, settings, ownerScope, overlayHost }) {
   // Snapshot identity is the invalidation boundary. A tab tap reuses the
   // authoritative Actor record and never constructs a selector or menu.
   const headerPreferences = { artwork: settings.headerArtwork, colorScheme: settings.colorScheme,
@@ -930,7 +1010,8 @@ function headerSpeedVital(actor, commands, scope) {
     button.setAttribute("aria-expanded", String(open));
     if (open) {
       const rect = control.getBoundingClientRect();
-      const pane = control.closest(".ve-character-screen")?.getBoundingClientRect();
+      // The wide layout's stats column scrolls and clips, so the popover stays inside it there.
+      const pane = (control.closest(".ve-sheet-stats-rail") ?? control.closest(".ve-character-screen"))?.getBoundingClientRect();
       const visual = globalThis.visualViewport;
       const placement = speedExtensionGeometry(rect, pane, visual, extension.getBoundingClientRect().width,
         globalThis.innerWidth ?? Infinity);
@@ -1042,7 +1123,7 @@ function headerInitiative(actor, commands, scope) {
 }
 
 // Dispatch one sheet tab to its panel renderer using shared row commands and state.
-function renderSheetPanel(tab, actor, commands, openItem, expandedItemId, openSectionIds, scope, settings, spellcastingSelection) {
+function renderSheetPanel(tab, actor, commands, openItem, expandedItemId, openSectionIds, scope, settings, spellcastingSelection, layout = SHEET_LAYOUT_STANDARD) {
   if (tab === "effects") return effectsPanel(actor, commands, openSectionIds, scope, settings);
   if (tab === "abilities") return abilitiesFullPanel(actor, commands, scope);
   if (tab === "party") return partyPanel(actor, commands, scope);
@@ -1051,7 +1132,7 @@ function renderSheetPanel(tab, actor, commands, openItem, expandedItemId, openSe
   if (tab === "spells") return spellsPanel(actor, commands, openItem, expandedItemId, openSectionIds, scope, settings, spellcastingSelection);
   if (tab === "features") return featuresPanel(actor, commands, openItem, expandedItemId, openSectionIds, scope, settings);
   if (tab === "biography") return biographyPanel(actor, commands, scope);
-  return overviewPanel(actor, commands, scope);
+  return overviewPanel(actor, commands, scope, layout);
 }
 
 // Render selected favorite items and their source-aware spell/action summaries.
@@ -1194,13 +1275,15 @@ function favouriteRow(item, actor, commands, openItem, expandedItemId, sourceMod
 }
 
 // Present the summary cards and actions most often used from the character sheet.
-function overviewPanel(actor, commands, scope) {
-  return node("div", { className: "ve-sheet-stack", children: [
-    activeEffectsPreview(actor, () => commands.selectCharacterTab("effects"), commands, scope),
-    abilitiesSavesPreview(actor, () => commands.selectCharacterTab("abilities"), commands, scope),
-    traitsPanel(actor, commands.localize),
-    weaponMasteryPreview(actor, commands, scope) // Player feedback (fork): Weapon Mastery
-  ] });
+// The wide tablet layout leaves out what its stats column already shows.
+function overviewPanel(actor, commands, scope, layout = SHEET_LAYOUT_STANDARD) {
+  const cards = {
+    effects: () => activeEffectsPreview(actor, () => commands.selectCharacterTab("effects"), commands, scope),
+    abilities: () => abilitiesSavesPreview(actor, () => commands.selectCharacterTab("abilities"), commands, scope),
+    traits: () => traitsPanel(actor, commands.localize),
+    mastery: () => weaponMasteryPreview(actor, commands, scope) // Player feedback (fork): Weapon Mastery
+  };
+  return node("div", { className: "ve-sheet-stack", children: dnd5eOverviewSections(layout).map((key) => cards[key]()) });
 }
 
 // Player feedback (fork): the Weapon masteries card, with Change for owners (new picks, or one swap after a Long Rest).
@@ -3145,11 +3228,13 @@ function quickbarSkillAttrs(skill) {
 }
 
 // Bind add-to-Quickbar prompts to eligible rendered item and skill rows.
-function bindQuickbarCandidates(screen, actor, commands, scope) {
+// The host is the screen, or a getter for it when the candidates are bound before the screen exists.
+// root narrows the candidates (the stats column binds its own); exclude skips a subtree.
+// shared holds the slot occupancy both bindings read, so an add from one is seen by the other.
+function bindQuickbarCandidates(host, actor, commands, scope, { root = null, exclude = "", shared = quickbarSlotState(null, actor) } = {}) {
   let prompt = null;
   let anchor = null;
   const visibleSlotCount = 50;
-  let slots = Array.from({ length: 50 }, (_, index) => actor.quickbar?.[index] ?? null);
 
   // Remove the prompt and discard its current candidate anchor.
   const dismiss = () => {
@@ -3160,7 +3245,7 @@ function bindQuickbarCandidates(screen, actor, commands, scope) {
   // Recheck available slots, then offer the add action beside this candidate.
   const show = (candidate) => {
     dismiss();
-    const full = slots.slice(0, visibleSlotCount).every(Boolean);
+    const full = shared.slots.slice(0, visibleSlotCount).every(Boolean);
     anchor = candidate;
     prompt = node("button", {
       className: `ve-quickbar-add-prompt${full ? " is-full" : ""}`,
@@ -3176,7 +3261,7 @@ function bindQuickbarCandidates(screen, actor, commands, scope) {
         currentPrompt.setAttribute("aria-busy", "true");
         try {
           const result = await commands.addQuickbarAction(characterRecordSourceUuid(actor), candidateDescriptor(candidate));
-          slots = [...result.slots];
+          shared.slots = [...result.slots];
           globalThis.navigator?.vibrate?.(5);
           if (prompt === currentPrompt) dismiss();
         } catch (error) {
@@ -3189,12 +3274,13 @@ function bindQuickbarCandidates(screen, actor, commands, scope) {
       } },
       children: [icon(full ? "fa-lock" : "fa-plus"), node("span", { text: full ? localizedText(commands.localize, "VEMOBILE.Character.Presenter.QuickbarFull", "Quickbar full") : localizedText(commands.localize, "VEMOBILE.Character.Presenter.AddToQuickbar2", "Add to Quickbar?") })]
     }, scope);
+    const screen = typeof host === "function" ? host() : host;
     screen.append(prompt);
     positionQuickbarPrompt(screen, candidate, prompt);
   };
 
-  for (const candidate of screen.querySelectorAll("[data-ve-quickbar-candidate]")) {
-    if (candidate.closest("[data-ve-item-actions]")) continue;
+  for (const candidate of (root ?? host).querySelectorAll("[data-ve-quickbar-candidate]")) {
+    if (candidate.closest("[data-ve-item-actions]") || (exclude && candidate.closest(exclude))) continue;
     bindLongPress(candidate, scope, () => show(candidate));
   }
   scope.listen(document, "pointerdown", (event) => {
@@ -3203,6 +3289,15 @@ function bindQuickbarCandidates(screen, actor, commands, scope) {
   }, { capture: true, passive: true });
   scope.listen(document, "scroll", dismiss, { capture: true, passive: true });
   scope.own(dismiss);
+}
+
+// One slot record per retained shell, reset whenever a newer Actor record brings its own Quickbar.
+function quickbarSlotState(shell, actor) {
+  const current = shell?.quickbarSlots;
+  if (current && current.source === actor.quickbar && current.actorSourceUuid === actor.sourceUuid) return current;
+  const next = { source: actor.quickbar, actorSourceUuid: actor.sourceUuid, slots: Array.from({ length: 50 }, (_, index) => actor.quickbar?.[index] ?? null) };
+  if (shell) shell.quickbarSlots = next;
+  return next;
 }
 
 // Parse and validate the inert Quickbar descriptor from a row's dataset.

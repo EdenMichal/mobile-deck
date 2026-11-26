@@ -48,7 +48,10 @@
     "assets/ve-builder.css",
     "assets/ve-item-create.css",
     "assets/ve-party.css",
-    "assets/ve-player-journals.css"
+    "assets/ve-player-journals.css",
+    "assets/ve-tablet-frame.css",
+    "assets/ve-tablet-sheet.css",
+    "assets/pf2e-tablet-sheet.css"
   ],
   "languages": [
     {

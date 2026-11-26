@@ -21,6 +21,7 @@ import { bindCharacterHeaderScroll } from "./character-header-scroll.mjs";
 import { createSceneTabGesture } from "./scene-tab-gesture.mjs";
 import { createControlsGuide } from "./controls-guide.mjs";
 import { createControlsInvitation } from "./controls-invitation.mjs";
+import { visibleCompanionRoute } from "../kernel/tablet-layout.mjs";
 
 const SCREENS = Object.freeze({
   characters: renderCharacters,
@@ -37,6 +38,8 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
   const root = node("div", { className: "ve-mobile-app", attrs: { role: "application", "aria-label": localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.VEMobile", "Mobile Deck") } });
   const viewport = node("main", { className: "ve-viewport" });
   const splitSceneViewport = node("main", { className: "ve-split-scene-viewport", attrs: { "aria-label": localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.ScenePanel", "Scene panel") } });
+  // Side by side: Chat, Journals or Combat beside the Character sheet, which stays in the main viewport.
+  const companionViewport = node("section", { className: "ve-companion-viewport", attrs: { hidden: true } });
   const panelOverlays = node("div", { className: "ve-panel-overlays", attrs: { "aria-live": "polite" } });
   const sceneActionOverlays = node("div", { className: "ve-panel-overlays ve-scene-action-overlays", attrs: { "aria-live": "polite" } });
   const sceneChooserOverlays = node("div", { className: "ve-scene-chooser-overlays", attrs: { id: "ve-scene-chooser-overlay", hidden: true } });
@@ -53,6 +56,8 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
   let renderedSplitSceneStructureKey = "";
   let renderedSplitSceneFocusKey = "";
   let splitActionSessionScope = null;
+  let companionScope = null;
+  let renderedCompanion = null;
   let sceneChooserScope = null;
   const expandedSceneFolderIds = new Set();
   const expandedSceneLevelIds = new Set();
@@ -63,6 +68,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
   const customThemePalette = createCustomThemePaletteResolver();
   let appliedCustomPalette = null;
   let activeSplitScreen = false;
+  let activeCompanionRoute = "";
   let activeTemplatePlacement = false;
   let sceneFocusTransitioning = false;
   let sceneFocusRequest = 0;
@@ -154,6 +160,14 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     on: { click: () => commands.toggleSplitScreen() },
     children: [icon("fa-table-columns"), node("span", { text: localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.SplitScreen", "Split Screen") })]
   }, scope);
+  const sheetCompanionToggle = node("button", {
+    className: "ve-sheet-companion-toggle",
+    attrs: { type: "button", "aria-label": localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.SideBySide", "Side by Side"), "aria-pressed": "false",
+      title: localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.SideBySideHint", "Keep the character sheet beside Chat, Journals or Combat") },
+    on: { click: () => commands.toggleSheetCompanion?.() },
+    children: [icon("fa-book-open"), node("span", { text: localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.SideBySide", "Side by Side") })]
+  }, scope);
+  const layoutToggles = node("div", { className: "ve-tablet-layout-toggles", children: [splitToggle, sheetCompanionToggle] });
 
   const navSideToggle = node("button", {
     className: "ve-tablet-nav-side-toggle",
@@ -236,7 +250,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     ]
   });
   const navRoutes = node("div", { className: "ve-nav-routes", children: [...navButtons.values(), metricsInfo] });
-  nav.append(splitToggle, rotateSuggestion, navRoutes, navSideToggle);
+  nav.append(layoutToggles, rotateSuggestion, navRoutes, navSideToggle);
   nav.append(pauseNotice);
 
   const backDispatcher = createVeBackDispatcher({
@@ -270,6 +284,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
   root.append(
     splitSceneViewport,
     viewport,
+    companionViewport,
     panelOverlays,
     sceneActionOverlays,
     sceneChooserOverlays,
@@ -287,8 +302,15 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     openGuide: anchor => controlsGuide.show(anchor) });
   root.append(controlsInvitation.element, controlsGuide.element);
 
-  // Reconcile state into persistent or replaced route surfaces, retaining panes only while their owning context stays valid.
+  // Reconcile the frame and main pane first, so a screen leaving the main pane releases shared native
+  // surfaces (Foundry's live Chat) before the companion pane claims them in the same publication.
   const render = (state) => {
+    renderFrame(state);
+    if (mounted && !scope.disposed) reconcileCompanionPane(state);
+  };
+
+  // Reconcile state into persistent or replaced route surfaces, retaining panes only while their owning context stays valid.
+  const renderFrame = (state) => {
     if (!mounted || scope.disposed) return;
     performanceObserver?.increment?.("render.frame");
     const latestPolicy = policy();
@@ -318,6 +340,13 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     const splitEnabled = latestPolicy.formFactor === "tablet" && latestPolicy.orientation === "landscape" && state.splitScreen;
     const splitActive = splitEnabled && (state.route !== "scene" || state.sceneChooserOpen);
     activeSplitScreen = splitActive;
+    // Side by side shows only with a ready session, so errors and loading keep the single-pane messages.
+    const companionEnabled = latestPolicy.formFactor === "tablet" && latestPolicy.orientation === "landscape" && Boolean(state.sheetCompanion) && !splitEnabled;
+    const companionRoute = companionEnabled && state.status === "ready" && state.snapshot ? visibleCompanionRoute(state) : "";
+    const pairActive = Boolean(companionRoute);
+    activeCompanionRoute = companionRoute;
+    // Sheet overlays cover only the sheet pane in both two-pane layouts, leaving the map or companion live.
+    const paneOverlays = splitActive || pairActive;
     activeTemplatePlacement = Boolean(state.templatePlacement || state.nativeTokenPlacement);
     const reconnectActive = Boolean(state.reconnect);
     const modeTransitionActive = Boolean(state.modeTransition);
@@ -327,10 +356,11 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     root.dataset.modeTransitionPhase = state.modeTransition?.phase ?? "ready";
     viewport.inert = reconnectActive || modeTransitionActive || root.dataset.sceneFocus === "true";
     splitSceneViewport.inert = reconnectActive || modeTransitionActive;
+    companionViewport.inert = reconnectActive || modeTransitionActive;
     sceneChooserOverlays.inert = reconnectActive || modeTransitionActive;
     nav.inert = reconnectActive || modeTransitionActive;
     const tabletNavSide = state.tabletNavSide === "left" ? "left" : "right";
-    const layoutKey = `${latestPolicy.formFactor}:${latestPolicy.orientation}:${splitActive ? "split" : "single"}:${tabletNavSide}`;
+    const layoutKey = `${latestPolicy.formFactor}:${latestPolicy.orientation}:${splitActive ? "split" : pairActive ? "pair" : "single"}:${tabletNavSide}`;
     if (renderedState?.layoutKey && renderedState.layoutKey !== layoutKey && previousSceneBounds && !externalLayoutTransition) {
       const fixedScreenPosition = previousSplitActive !== splitActive;
       const anchor = fixedScreenPosition
@@ -360,6 +390,9 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     root.dataset.formFactor = latestPolicy.formFactor;
     root.dataset.orientation = latestPolicy.orientation;
     root.dataset.splitScreen = String(splitActive);
+    root.dataset.sheetCompanion = String(pairActive);
+    if (companionRoute) root.dataset.companionRoute = companionRoute;
+    else delete root.dataset.companionRoute;
     root.dataset.navSide = tabletNavSide;
     root.dataset.joystickSide = settings.joystickResolvedSide;
     root.dataset.route = state.route;
@@ -400,6 +433,10 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     splitToggle.classList.toggle("is-active", splitEnabled);
     splitToggle.setAttribute("aria-pressed", String(splitEnabled));
     splitToggle.disabled = activeTemplatePlacement || state.canvasAvailable === false;
+    const companionToggleOn = latestPolicy.formFactor === "tablet" && latestPolicy.orientation === "landscape" && Boolean(state.sheetCompanion);
+    sheetCompanionToggle.classList.toggle("is-active", companionToggleOn);
+    sheetCompanionToggle.setAttribute("aria-pressed", String(companionToggleOn));
+    sheetCompanionToggle.disabled = activeTemplatePlacement;
     navSideToggle.disabled = activeTemplatePlacement;
     const navSideDestination = tabletNavSide === "right" ? "left" : "right";
     const navSideLabel = navSideDestination === "left" ? localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.MoveNavigationToLeftSide", "Move navigation to left side") : localizedText(commands.localize, "VEMOBILE.Navigation.MoveRight", "Move navigation to right side");
@@ -409,7 +446,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     navSideIcon.classList.toggle("fa-arrow-right", navSideDestination === "right");
 
     const combatControls = state.snapshot?.combatControls;
-    const combatControlsHidden = state.route !== "combat" || !combatControls?.isGM || state.status !== "ready";
+    const combatControlsHidden = (state.route !== "combat" && companionRoute !== "combat") || !combatControls?.isGM || state.status !== "ready";
     root.dataset.gmCombatControls = String(!combatControlsHidden);
     const combatControlsKey = `${combatControlsHidden}:${commands.readLocale?.() ?? "en"}:${JSON.stringify(combatControls ?? null)}`;
     combatControlsHost.hidden = combatControlsHidden;
@@ -432,9 +469,12 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
       : localizedText(commands.localize, "VEMOBILE.Navigation.Paused", "Game paused");
     if (pauseNotice.textContent !== pauseCopy) pauseNotice.textContent = pauseCopy;
     for (const [route, button] of navButtons) {
-      const active = state.route === route;
+      const companion = companionRoute === route;
+      const active = state.route === route || companion;
       button.classList.toggle("is-active", active);
-      if (active) button.setAttribute("aria-current", "page");
+      button.classList.toggle("is-companion", companion);
+      // Two screens are current in Side by side, so neither claims to be the one current page.
+      if (active) button.setAttribute("aria-current", pairActive ? "true" : "page");
       else button.removeAttribute("aria-current");
       button.disabled = activeTemplatePlacement;
       if (route === "combat") button.classList.toggle("has-active-encounter", Boolean(state.snapshot?.combat?.started));
@@ -472,7 +512,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     // Party inventory quantity/coin sheet (dnd5e): opening or closing it must render the Character pane.
     const partySheetChanged = renderedState?.partySheet !== state.partySheet;
     const portraitImageChanged = renderedState?.portraitImage !== state.portraitImage;
-    const journalChanged = journalPresentationChanged(renderedState, state);
+    const journalChanged = mainPaneJournalChanged(renderedState, state);
     const viewChanged = renderedState?.viewRevision !== state.viewRevision;
     const sceneChooserChanged = renderedState?.sceneChooserOpen !== state.sceneChooserOpen
       || renderedState?.sceneChooserRevision !== state.sceneChooserRevision;
@@ -524,8 +564,8 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
       renderedSplitSceneStructureKey = "";
       renderedSplitSceneFocusKey = "";
       splitSceneViewport.replaceChildren();
-      // A retained Settings presenter rehomes its owned surfaces below.
-      if (!(state.route === "settings" && renderedState?.route === "settings")) panelOverlays.replaceChildren();
+      // A retained Settings presenter rehomes its owned surfaces below; Side by side keeps the sheet's overlays.
+      if (!pairActive && !(state.route === "settings" && renderedState?.route === "settings")) panelOverlays.replaceChildren();
     }
 
     const splitActionSessionId = splitSceneActionSessionId(state, splitActive);
@@ -784,7 +824,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
         state,
         commands,
         scope: screenScope,
-        overlayHost: splitActive ? panelOverlays : null,
+        overlayHost: paneOverlays ? panelOverlays : null,
         expandedFolderIds: expandedSceneFolderIds,
         expandedLevelSceneIds: expandedSceneLevelIds,
         sceneChoiceTransition
@@ -807,7 +847,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
   let controlsContextKey = "";
   scope.own(store.subscribe(state => {
     controlsInvitation.reconcile();
-    const key = `${state.formFactor}:${state.orientation}:${state.splitScreen}:${state.canvasAvailable}:${state.selectedActorSourceUuid}`;
+    const key = `${state.formFactor}:${state.orientation}:${state.splitScreen}:${state.sheetCompanion}:${state.canvasAvailable}:${state.selectedActorSourceUuid}`;
     if (key !== controlsContextKey) { controlsGuide.refresh(); controlsInvitation.refreshLabels?.(); }
     controlsContextKey = key;
   }, { immediate: false }));
@@ -1045,6 +1085,10 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     splitSceneScope = null;
     splitActionSessionScope?.dispose();
     splitActionSessionScope = null;
+    companionScope?.dispose();
+    companionScope = null;
+    renderedCompanion = null;
+    activeCompanionRoute = "";
     sceneChooserScope?.dispose();
     sceneChooserScope = null;
     sceneLayoutAnchorScope?.dispose();
@@ -1076,6 +1120,45 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     customThemePalette.clear();
     appliedCustomPalette = null;
     root.remove();
+  }
+
+  // Mount Chat, Journals or Combat beside the pinned sheet, rebuilding only when that screen's own data changed.
+  function reconcileCompanionPane(state) {
+    const route = activeCompanionRoute;
+    companionViewport.hidden = !route;
+    if (!route) {
+      if (companionScope || renderedCompanion) {
+        companionScope?.dispose();
+        companionScope = null;
+        renderedCompanion = null;
+        companionViewport.replaceChildren();
+        companionViewport.removeAttribute("aria-label");
+      }
+      return;
+    }
+    const next = { ...screenState(state), route };
+    if (companionScope && !companionPaneChanged(renderedCompanion, next)) {
+      renderedCompanion = next;
+      return;
+    }
+    const routeChanged = renderedCompanion?.route !== route;
+    companionScope?.dispose();
+    companionScope = scope.child(`companion:${route}`);
+    const label = companionPaneLabel(route, commands.localize);
+    companionViewport.setAttribute("aria-label", label);
+    try {
+      performanceObserver?.increment?.(`render.companion.${route}`);
+      companionViewport.replaceChildren(SCREENS[route]({ state, commands, scope: companionScope, overlayHost: null }));
+      if (routeChanged) companionViewport.scrollTop = 0;
+    } catch (error) {
+      console.error(`Mobile Deck | Could not render ${route} beside the character sheet`, error);
+      companionScope.dispose();
+      companionViewport.replaceChildren(node("section", {
+        className: "ve-empty",
+        children: [icon("fa-triangle-exclamation"), node("h2", { text: localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.ThisScreenCouldNotOpen", "This screen could not open") }), node("p", { text: localizedText(commands.localize, "VEMOBILE.Interface.AppFrame.ReloadFoundryAndTryAgain", "Reload Foundry and try again.") })]
+      }));
+    }
+    renderedCompanion = next;
   }
 
   // Return the real Scene host for geometry settlement, including the split pane when active.
@@ -1847,6 +1930,30 @@ function screenState(state, layoutKey = "") {
     viewRevision: state.viewRevision,
     layoutKey
   };
+}
+
+/** Decide whether the companion pane must rebuild. Foundry keeps the docked Chat live by itself;
+ * Journals and Combat follow the same inputs that rebuild them in the main pane. */
+export function companionPaneChanged(previous, current) {
+  if (!previous || previous.route !== current?.route) return true;
+  if (current.route === "chat") return false;
+  if (previous.viewRevision !== current.viewRevision || previous.status !== current.status) return true;
+  if (current.route === "journals") return journalPresentationChanged(previous, current) || previous.snapshot?.journals !== current.snapshot?.journals;
+  return previous.snapshot?.combat !== current.snapshot?.combat;
+}
+
+// Name the companion pane after the screen it shows, using the same words as the rail.
+function companionPaneLabel(route, localize = null) {
+  const label = { chat: "Chat", journals: "Journals", combat: "Combat" }[route] ?? "Chat";
+  return localizedText(localize, "VEMOBILE.Interface.AppFrame.CompanionPane", "{screen} beside the character sheet", {
+    screen: localize?.(`VEMOBILE.Navigation.${label}`, label) ?? label
+  });
+}
+
+// Only the Journals route reads journal state in the main pane. In Side by side the reader sits in the
+// companion pane (companionPaneChanged), so its page, menu and image changes must leave the pinned sheet alone.
+export function mainPaneJournalChanged(previous, current) {
+  return current?.route === "journals" && journalPresentationChanged(previous, current);
 }
 
 // Compare only reader/menu/page state when deciding whether the journal route needs refreshing.

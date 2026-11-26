@@ -1,7 +1,9 @@
 // Plain application state for app-kernel.mjs; reducers never read live Foundry documents.
+import { COMPANION_ROUTES, companionRoute, tabletLayoutMode } from "./tablet-layout.mjs";
+
 const ROUTES = new Set(["characters", "chat", "journals", "scene", "combat", "settings"]);
 const NAVIGATION_INTENTS = new Set(["navigate", "navigate-back", "return-to-character", "select-actor", "select-character-tab",
-  "open-scene-chooser", "open-split-scene-chooser", "close-scene-chooser", "toggle-scene-chooser", "toggle-split-screen",
+  "open-scene-chooser", "open-split-scene-chooser", "close-scene-chooser", "toggle-scene-chooser", "toggle-split-screen", "toggle-sheet-companion",
   "open-full-scene", "return-to-scene-after-action", "mode-transition-started", "reconnect-started", "action-navigation-invalidated"]);
 
 export const initialAppState = Object.freeze({
@@ -41,6 +43,11 @@ export const initialAppState = Object.freeze({
   splitScreenPreferred: true,
   canvasAvailable: true,
   splitSecondaryRoute: "characters",
+  // Side by side: the Character sheet pinned beside Chat, Journals or Combat. While it is on, those
+  // three screens never become the route; route stays "characters" and companionRoute names the other pane.
+  sheetCompanion: false,
+  sheetCompanionPreferred: false,
+  companionRoute: "chat",
   tabletNavSide: "right",
   formFactor: "phone",
   orientation: "portrait",
@@ -55,7 +62,7 @@ export const initialAppState = Object.freeze({
 // Apply the event, then advance navigation intent when a route, layout or Scene change invalidates pending actions.
 export function reduceAppState(state, event) {
   const next = reduceState(state, event);
-  const layoutChanged = event.type === "layout-policy-changed" && ["formFactor", "orientation", "splitScreen", "canvasAvailable"]
+  const layoutChanged = event.type === "layout-policy-changed" && ["formFactor", "orientation", "splitScreen", "sheetCompanion", "canvasAvailable"]
     .some(key => state[key] !== next[key]);
   const sceneChanged = event.type === "session-loaded" && ["id", "levelId", "canvasReady", "canvasDisabled"]
     .some(key => state.snapshot?.scene?.[key] !== next.snapshot?.scene?.[key]);
@@ -124,9 +131,11 @@ function reduceState(state, event) {
     case "session-error":
       return { ...state, status: "error", error: String(event.error?.message ?? event.error ?? "VEMOBILE.Errors.Unknown") };
     case "navigate": {
-      const route = ROUTES.has(event.route) ? event.route : "characters";
-      if ((state.templatePlacement || state.nativeTokenPlacement) && route !== "scene") return state;
-      return state.route === route ? state : { ...state, route, routeHistory: pushRouteHistory(state.routeHistory, state.route), sceneChooserOpen: false, splitSecondaryRoute: route === "scene" ? state.splitSecondaryRoute : route, rollResult: route === "characters" ? state.rollResult : null, characterItemId: route === "characters" ? state.characterItemId : "", expandedCharacterItemId: route === "characters" ? state.expandedCharacterItemId : "", characterOpenSections: route === "characters" ? disclosureSections(state.characterDisclosureByContext, activeActorSource(state), state.characterTab) : [], hitPointEditor: route === "characters" ? state.hitPointEditor : "", restEditor: route === "characters" ? state.restEditor : false, spellSlotEditor: route === "characters" ? state.spellSlotEditor : null, xpEditor: route === "characters" ? state.xpEditor : false, partySheet: route === "characters" ? state.partySheet : null, portraitImage: route === "characters" ? state.portraitImage : null };
+      const requested = ROUTES.has(event.route) ? event.route : "characters";
+      if ((state.templatePlacement || state.nativeTokenPlacement) && requested !== "scene") return state;
+      const { route, companion } = pairedRoute(state, requested);
+      if (state.route === route) return state.companionRoute === companion ? state : { ...state, companionRoute: companion };
+      return { ...state, route, companionRoute: companion, routeHistory: pushRouteHistory(state.routeHistory, state.route), sceneChooserOpen: false, splitSecondaryRoute: route === "scene" ? state.splitSecondaryRoute : route, rollResult: route === "characters" ? state.rollResult : null, characterItemId: route === "characters" ? state.characterItemId : "", expandedCharacterItemId: route === "characters" ? state.expandedCharacterItemId : "", characterOpenSections: route === "characters" ? disclosureSections(state.characterDisclosureByContext, activeActorSource(state), state.characterTab) : [], hitPointEditor: route === "characters" ? state.hitPointEditor : "", restEditor: route === "characters" ? state.restEditor : false, spellSlotEditor: route === "characters" ? state.spellSlotEditor : null, xpEditor: route === "characters" ? state.xpEditor : false, partySheet: route === "characters" ? state.partySheet : null, portraitImage: route === "characters" ? state.portraitImage : null };
     }
     case "return-to-scene-after-action": {
       const next = reduceState(state, { type: "navigate", route: "scene" });
@@ -143,7 +152,9 @@ function reduceState(state, event) {
     case "navigate-back": {
       const prior = popRouteHistory(state.routeHistory);
       if (!prior.route || !ROUTES.has(prior.route)) return state;
-      return { ...state, route: prior.route, routeHistory: prior.history, sceneChooserOpen: false, journal: prior.route === "journals" ? state.journal : null, journalPageId: prior.route === "journals" ? state.journalPageId : "", journalImage: null, characterItemId: "", expandedCharacterItemId: "", hitPointEditor: "", restEditor: false, spellSlotEditor: null, xpEditor: false, partySheet: null, portraitImage: null };
+      const { route, companion } = pairedRoute(state, prior.route);
+      const journalKept = route === "journals" || (route === "characters" && sheetCompanionOn(state) && companion === "journals");
+      return { ...state, route, companionRoute: companion, routeHistory: prior.history, sceneChooserOpen: false, journal: journalKept ? state.journal : null, journalPageId: journalKept ? state.journalPageId : "", journalImage: null, characterItemId: "", expandedCharacterItemId: "", hitPointEditor: "", restEditor: false, spellSlotEditor: null, xpEditor: false, partySheet: null, portraitImage: null };
     }
     case "select-actor":
       return { ...state, characterNavigation: Object.freeze([]), selectedActorId: event.actorId ?? state.selectedActorId, selectedActorSourceUuid: event.sourceUuid ?? state.selectedActorSourceUuid, characterTab: "overview", route: "characters", sceneChooserOpen: false, splitSecondaryRoute: "characters", rollResult: null, characterItemId: "", expandedCharacterItemId: "", characterOpenSections: disclosureSections(state.characterDisclosureByContext, event.sourceUuid ?? state.selectedActorSourceUuid, "overview"), hitPointEditor: "", restEditor: false, spellSlotEditor: null, xpEditor: false, partySheet: null, portraitImage: null };
@@ -287,22 +298,28 @@ function reduceState(state, event) {
       return state.sceneChooserOpen ? { ...state, sceneChooserRevision: state.sceneChooserRevision + 1 } : state;
     case "toggle-split-screen":
       if (state.templatePlacement || state.nativeTokenPlacement) return state;
+      // Turning Split Screen on turns Side by side off and forgets it, so a rotation cannot bring both back.
       return state.formFactor === "tablet" && state.orientation === "landscape" && state.canvasAvailable !== false
-        ? { ...state, splitScreen: !state.splitScreen, splitScreenPreferred: !state.splitScreen }
+        ? { ...state, splitScreen: !state.splitScreen, splitScreenPreferred: !state.splitScreen,
+          ...(state.splitScreen ? {} : { sheetCompanion: false, sheetCompanionPreferred: false }) }
         : state.splitScreen ? { ...state, splitScreen: false } : state;
+    case "toggle-sheet-companion": {
+      if (state.templatePlacement || state.nativeTokenPlacement) return state;
+      if (state.formFactor !== "tablet" || state.orientation !== "landscape") return state.sheetCompanion ? { ...state, sheetCompanion: false } : state;
+      if (state.sheetCompanion) return { ...state, sheetCompanion: false, sheetCompanionPreferred: false };
+      // Needs no canvas. Turning it on turns Split Screen off and forgets it, mirroring the Split toggle.
+      return enterSheetCompanion({ ...state, sheetCompanion: true, sheetCompanionPreferred: true, splitScreen: false, splitScreenPreferred: false });
+    }
     case "layout-policy-changed": {
       const formFactor = event.formFactor === "tablet" ? "tablet" : "phone";
       const orientation = event.orientation === "landscape" ? "landscape" : "portrait";
       const canvasAvailable = event.canvasAvailable !== false;
-      return {
-        ...state,
-        formFactor,
-        orientation,
-        canvasAvailable,
-        splitScreen: formFactor === "tablet" && orientation === "landscape" && canvasAvailable
-          ? Boolean(state.splitScreenPreferred || state.splitScreen)
-          : false
-      };
+      const landscapeTablet = formFactor === "tablet" && orientation === "landscape";
+      const splitScreen = landscapeTablet && canvasAvailable ? Boolean(state.splitScreenPreferred || state.splitScreen) : false;
+      // Split Screen wins if both were ever remembered; the toggles keep that from happening.
+      const sheetCompanion = landscapeTablet && !splitScreen ? Boolean(state.sheetCompanionPreferred || state.sheetCompanion) : false;
+      const next = { ...state, formFactor, orientation, canvasAvailable, splitScreen, sheetCompanion };
+      return sheetCompanion && !state.sheetCompanion ? enterSheetCompanion(next) : next;
     }
     case "open-full-scene":
       return {
@@ -399,6 +416,25 @@ function reduceState(state, event) {
     default:
       return state;
   }
+}
+
+// True when the reducer's own layout fields have Side by side on; the frame also checks the live policy.
+function sheetCompanionOn(state) {
+  return tabletLayoutMode(state) === "companion";
+}
+
+// While Side by side is on, Chat, Journals and Combat open beside the pinned sheet instead of replacing it.
+function pairedRoute(state, route) {
+  return sheetCompanionOn(state) && COMPANION_ROUTES.includes(route)
+    ? { route: "characters", companion: route }
+    : { route, companion: state.companionRoute };
+}
+
+// Fold a companion route into the pair when Side by side starts, keeping the screen the user was reading.
+function enterSheetCompanion(state) {
+  if (!COMPANION_ROUTES.includes(state.route)) return { ...state, companionRoute: companionRoute(state) };
+  return { ...state, route: "characters", companionRoute: state.route, sceneChooserOpen: false,
+    characterOpenSections: disclosureSections(state.characterDisclosureByContext, activeActorSource(state), state.characterTab) };
 }
 
 // Keep only the latest sixteen routes so Back history stays bounded.

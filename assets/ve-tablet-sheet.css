@@ -1,0 +1,217 @@
+/* Tablet layout styles. Loaded after ve-mobile.css and pf2e.css. */
+
+/* ==========================================================================
+   Wide character sheet shell (any system).
+   A landscape tablet pane that owns the whole width shows a fixed stats
+   column on the left and the tab bar plus tab content on the right:
+     section.ve-character-screen[data-sheet-layout="wide"].ve-sheet-wide
+       aside.ve-sheet-stats-rail          scrolls on its own
+         .ve-character-selector           identity header (shared)
+         .ve-sheet-stats-rail-body        system cards
+       div.ve-sheet-wide-main
+         .ve-sheet-tabs
+         .ve-character-content-scroller   the only sheet scroller the frame tracks
+   Everything here keys on data-sheet-layout, never on frame attributes.
+   The style-authority layer pins the shell with !important, so its contested
+   properties are repeated inside that layer further down.
+   ========================================================================== */
+
+.ve-mobile-app .ve-viewport > .ve-character-screen[data-sheet-layout="wide"] {
+  --ve-sheet-rail-width: clamp(340px, 31%, 380px);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--ve-sheet-rail-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+  gap: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ve-character-screen[data-sheet-layout="wide"] > .ve-sheet-stats-rail {
+  box-sizing: border-box;
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 12px 24px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  border-inline-end: 1px solid var(--ve-border);
+  background: color-mix(in srgb, var(--ve-surface) 38%, transparent);
+}
+
+.ve-sheet-stats-rail > *,
+.ve-sheet-stats-rail-body > * {
+  min-width: 0;
+}
+
+.ve-sheet-stats-rail-body {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.ve-sheet-stats-rail > .ve-actor-origin-back {
+  justify-self: start;
+}
+
+.ve-character-screen[data-sheet-layout="wide"] > .ve-sheet-wide-main {
+  box-sizing: border-box;
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 16px 0;
+  overflow: hidden;
+}
+
+.ve-sheet-wide-main > .ve-sheet-tabs {
+  flex: 0 0 auto;
+  position: relative;
+  top: 0;
+}
+
+.ve-sheet-wide-main > .ve-character-content-scroller {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+@layer ve-mobile-style-authority {
+  .ve-mobile-app[data-ve-style-authority] .ve-viewport > .ve-character-screen.ve-character-shared-shell[data-sheet-layout="wide"] {
+    display: grid !important;
+    grid-template-columns: var(--ve-sheet-rail-width) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    gap: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .ve-mobile-app[data-ve-style-authority] .ve-character-screen[data-sheet-layout="wide"] .ve-sheet-wide-main > .ve-sheet-tabs {
+    position: relative !important;
+    top: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   D&D5e wide sheet: the stats column contents.
+   ========================================================================== */
+
+/* The identity header in the column matches the narrow Split and phone header.
+   The landscape tablet rules in ve-mobile.css would otherwise give it serif
+   subtitles and small left-aligned HP labels meant for an 800px header. */
+.ve-mobile-app .ve-character-screen[data-sheet-layout="wide"] .ve-sheet-stats-rail .ve-sheet-identity-copy p {
+  font-family: "Roboto Condensed", Arial, sans-serif;
+}
+
+.ve-mobile-app .ve-character-screen[data-sheet-layout="wide"] .ve-sheet-stats-rail .ve-compact-header .ve-character-header-hp :is(.ve-character-header-hp-main, .ve-character-header-temp-hp) > small {
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+/* Skills: one dense, still 44px-tall row per skill with its ability and passive score. */
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-skills .ve-skill-row {
+  min-height: 44px;
+  padding: 5px 12px;
+  grid-template-columns: 12px minmax(0, 1fr) auto 18px;
+  gap: 9px;
+}
+
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-skills .ve-skill-row > span:nth-child(2) {
+  gap: 1px;
+}
+
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-skills .ve-skill-row strong {
+  overflow: hidden;
+  font-size: 0.84rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-skills .ve-skill-row small {
+  font-size: 0.66rem;
+  line-height: 1.15;
+}
+
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-skills .ve-skill-row b {
+  font-size: 0.95rem;
+}
+
+/* Tools: names are long, so one per row. */
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-tools .ve-trained-skills-list {
+  padding: 9px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ve-mobile-app .ve-sheet-stats-rail .ve-sheet-rail-tools .ve-trained-skill {
+  min-height: 44px;
+}
+
+/* Ability check and save buttons reach the 44px touch size in the column. */
+.ve-mobile-app .ve-sheet-stats-rail .ve-abilities-saves-grid > article {
+  min-height: 89px;
+  grid-template-rows: 45px 44px;
+}
+
+/* Trait labels such as Resistances fit on one line in the narrower tab column. */
+.ve-mobile-app .ve-character-screen[data-sheet-layout="wide"] .ve-trait-group {
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+}
+
+/* ==========================================================================
+   D&D5e portrait tablet: the single stacked pane, using the width it has.
+   ========================================================================== */
+
+@media (min-width: 700px) {
+  /* All six abilities in one row, with 44px check and save buttons. */
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-abilities-saves-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-abilities-saves-grid > article {
+    min-height: 89px;
+    grid-template-rows: 45px 44px;
+  }
+
+  /* The full skill list on the Abilities page in three columns of 44px rows. */
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-skill-list-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-skill-list-compact .ve-skill-row {
+    min-height: 44px;
+  }
+
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-skill-list-compact .ve-skill-row > span:nth-child(2) {
+    font-size: 0.72rem;
+  }
+
+  /* Trained skills and tools: 44px rows. */
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-trained-skill {
+    min-height: 44px;
+  }
+
+  .ve-mobile-app[data-form-factor="tablet"][data-orientation="portrait"] .ve-character-screen .ve-trait-group {
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+  }
+}

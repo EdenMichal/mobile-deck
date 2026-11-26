@@ -1,0 +1,82 @@
+/* PF2e tablet sheet styles. Loaded last, after pf2e.css and ve-tablet-sheet.css.
+   The PF2e sheet pins its look in the style-authority layer, so every rule here
+   repeats that layer and its !important, with one more attribute to win. */
+
+/* ==========================================================================
+   PF2e wide sheet: the generic two-column shell from ve-tablet-sheet.css with
+     aside.ve-sheet-stats-rail
+       .ve-pf2e-character-selector     identity, HP, hero points, AC, speed,
+                                       perception and class DC (the header)
+       .ve-sheet-stats-rail-body
+         .ve-pf2e-rail-statistics      saving throws beside attributes
+         .ve-pf2e-rail-skills          core skills, then .is-lore
+     div.ve-sheet-wide-main            tab bar over the content scroller
+   ========================================================================== */
+
+@layer ve-mobile-style-authority {
+  .ve-mobile-app[data-ve-style-authority][data-form-factor] .ve-viewport > .ve-character-screen.ve-pf2e-character-screen[data-sheet-layout="wide"] {
+    /* Tabs share the bar's width and leave a gap above the content, like the D&D5e sheet. */
+    & > .ve-sheet-wide-main { gap: 10px !important; }
+    & > .ve-sheet-wide-main > .ve-sheet-tabs > button { flex: 1 0 auto !important; }
+    & > .ve-sheet-wide-main > .ve-character-content-scroller { padding: 0 0 16px !important; }
+
+    /* Saves and attributes keep their Character tab composition inside one card. */
+    & .ve-sheet-stats-rail .ve-pf2e-overview.ve-pf2e-rail-statistics {
+      padding: 10px !important;
+      border: 1px solid var(--ve-border) !important;
+      border-radius: 10px !important;
+      background: linear-gradient(110deg, var(--ve-surface), var(--ve-bg)) !important;
+    }
+
+    /* Skill rows stay 44px tall; long names and lores wrap rather than widen the column. */
+    & .ve-sheet-stats-rail .ve-pf2e-rail-skills .ve-pf2e-proficiency-skill { min-height: 44px !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-rail-skills .ve-pf2e-skill-roll { min-height: 44px !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-rail-skills .ve-pf2e-skill-roll > span { overflow-wrap: anywhere !important; }
+
+    /* Long names stop at two lines, as in the D&D5e column; the heading's title holds the full name. */
+    & .ve-sheet-stats-rail .ve-sheet-identity-copy h2 {
+      display: -webkit-box !important;
+      -webkit-box-orient: vertical !important;
+      -webkit-line-clamp: 2 !important;
+      overflow: hidden !important;
+      overflow-wrap: break-word !important;
+    }
+
+    /* Large hit point totals move their maximum to a second line instead of covering Temp HP. */
+    & .ve-sheet-stats-rail .ve-pf2e-health-cell .ve-pf2e-health-number { min-width: 0 !important; max-width: 100% !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-hp-value { display: flex !important; flex-wrap: wrap !important; justify-content: center !important; align-items: baseline !important; column-gap: 3px !important; min-width: 0 !important; }
+
+    /* Header controls reach the 44px touch size in the column. The XP bar stays 8px
+       tall; its tap area covers the class and XP line above it. */
+    & .ve-sheet-stats-rail .ve-pf2e-experience-details { position: relative !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-xp-gauge { position: static !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-xp-gauge::after { content: "" !important; position: absolute !important; inset: -7px 0 -6px !important; }
+    & .ve-sheet-stats-rail :is(.ve-pf2e-perception-stat, .ve-pf2e-speed-stat) button.ve-pf2e-action-button { min-width: 44px !important; min-height: 44px !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-ac-settings { min-width: 44px !important; min-height: 44px !important; }
+    & .ve-sheet-stats-rail .ve-pf2e-portrait > .ve-pf2e-portrait-recovery { height: 44px !important; min-height: 44px !important; font-size: 12px !important; }
+  }
+}
+
+/* ==========================================================================
+   PF2e portrait tablet: the single stacked pane, using the width it has.
+   ========================================================================== */
+
+@layer ve-mobile-style-authority {
+  @media (min-width: 700px) {
+    .ve-mobile-app[data-ve-style-authority][data-form-factor="tablet"][data-orientation="portrait"] .ve-viewport > .ve-character-screen.ve-pf2e-character-screen {
+      /* Tabs share the bar's width. */
+      & .ve-sheet-tabs > button { flex: 1 0 auto !important; }
+
+      /* Character: the three saves in one row, then all six attributes in one row. */
+      & .ve-pf2e-overview .ve-pf2e-overview-stats { grid-template-columns: minmax(0, 1fr) !important; gap: 16px !important; }
+      & .ve-pf2e-overview .ve-pf2e-saves { padding-right: 0 !important; border-right: 0 !important; }
+      & .ve-pf2e-overview .ve-pf2e-save-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-template-rows: minmax(56px, auto) !important; }
+      & .ve-pf2e-overview .ve-pf2e-attribute-grid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; grid-template-rows: minmax(56px, auto) !important; }
+
+      /* Proficiencies: skills, lores and proficiency readouts in two columns of 44px rows. */
+      & .ve-pf2e-statistics .ve-pf2e-proficiency-skills,
+      & .ve-pf2e-statistics .ve-pf2e-proficiency-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; column-gap: 12px !important; }
+      & .ve-pf2e-statistics .ve-pf2e-proficiency-skill { min-height: 44px !important; }
+    }
+  }
+}

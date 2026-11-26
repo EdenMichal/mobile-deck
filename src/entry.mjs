@@ -74,6 +74,7 @@ import { applyPlayerNoCanvasDefault } from "./foundry/player-canvas-default.mjs"
 import { isCommonDisplayUser } from "./foundry/common-display-user.mjs";
 import { createPlayerJournalGateway } from "./foundry/player-journal-gateway.mjs";
 import { createPlayerJournalsOpener } from "./features/journals/player-journals-layer.mjs";
+import { routeVisible } from "./kernel/tablet-layout.mjs";
 
 const isGamePage = /\/game\/?$/.test(window.location.pathname);
 
@@ -575,7 +576,7 @@ if (isGamePage) {
   const themeGateway = createFoundryThemeGateway();
   const combatGateway = createFoundryCombatGateway({
     systemIntegration,
-    isMobileActive: () => Boolean(kernel?.active && readPolicy().active && store.state.route === "combat"),
+    isMobileActive: () => Boolean(kernel?.active && readPolicy().active && routeVisible(store.state, "combat")),
     getLifecycleToken: () => kernel?.combatControlLifecycleToken?.() ?? null,
     getConnectionGeneration: () => connectionGeneration.current,
     trace: (entry) => diagnostics.record("debug", `Combat camera ${JSON.stringify(entry)}`)

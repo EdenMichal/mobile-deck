@@ -125,7 +125,7 @@ function journalPage(page, selectedHeading, commands, scope) {
       const tableOfContents = page.toc ?? [];
       const index = tableOfContents.findIndex((heading) => heading.slug === selectedHeading);
       const target = [...content.querySelectorAll("[id]")].find((element) => element.id === selectedHeading) ?? headings[index];
-      const scroller = content.closest(".ve-viewport");
+      const scroller = content.closest(".ve-viewport, .ve-companion-viewport");
       if (!target || !scroller) return;
       scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12;
     });

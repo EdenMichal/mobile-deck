@@ -1,11 +1,11 @@
 /** Static, audited copy keys. Context is a narrow presentation record, never diagnostics. */
-export function controlsGuideSections({ presentation = "desktop", canvasAvailable = true, split = false, canPlaceActor = false, collective = false, actionBarSource = "character" } = {}) {
+export function controlsGuideSections({ presentation = "desktop", canvasAvailable = true, split = false, sideBySide = false, canPlaceActor = false, collective = false, actionBarSource = "character" } = {}) {
   const sections = [
     { id: "common", entries: ["Tap", "Hold", "Back", "Availability", "ScenePause"] },
     ...(canvasAvailable ? [{ id: "scene", entries: ["Pan", "Select", "Target", "TokenHold", "TokenDrag", "Scenery", "Joystick"] }] : [{ id: "scene", entries: ["NoCanvas"] }]),
     { id: "character", entries: ["Portrait", "Chooser", "Rows", ...(collective ? ["Members"] : []), actionBarSource === "foundry" ? "Hotbar" : "Quickbar"] },
     { id: "placement", entries: ["Navigation", ...(canvasAvailable ? ["Preview", ...(canPlaceActor && !collective ? [split ? "SplitDrop" : "ActorPlace"] : [])] : [])] },
-    { id: "layout", entries: [...(presentation === "desktop" ? ["DesktopReview", "Phone", "TabletSplit", "TabletFull"] : [ presentation === "phone" ? "Phone" : split ? "TabletSplit" : "TabletFull"])] }
+    { id: "layout", entries: [...(presentation === "desktop" ? ["DesktopReview", "Phone", "TabletSplit", "TabletSideBySide", "TabletFull"] : [ presentation === "phone" ? "Phone" : split ? "TabletSplit" : sideBySide ? "TabletSideBySide" : "TabletFull"])] }
   ];
   return Object.freeze(sections.map(section => Object.freeze({ ...section, entries: Object.freeze(section.entries) })));
 }

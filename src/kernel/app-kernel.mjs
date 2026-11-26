@@ -9,6 +9,7 @@ import { createTemplatePlacementController } from "./template-placement-session.
 import { createNativeTokenPlacementController } from "./native-token-placement-session.mjs";
 import { ACTOR_COMMANDS } from "./command-names.mjs";
 import { createActionSceneReturn } from "./action-scene-return.mjs";
+import { routeVisible, tabletLayoutMode } from "./tablet-layout.mjs";
 import { createModeTransitionCoordinator, presentationLabel } from "./mode-transition.mjs";
 
 // Recognise an exact selected/listed actor source instead of treating a matching world Actor ID as sufficient.
@@ -85,7 +86,7 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
     return guardConnection((expected) => {
       const state = store.state;
       if (!activationCommitted || !lifecycleToken || runtimeScope !== lifecycleToken || lifecycleToken.disposed || !readPolicy().active
-        || state.reconnect || state.modeTransition || state.route !== "combat") {
+        || state.reconnect || state.modeTransition || !routeVisible(state, "combat")) {
         throw new Error(localizedText(localize, "VEMOBILE.Interface.CombatGateway.MobileCombatControlsAreNoLongerActive", "Mobile combat controls are no longer active."));
       }
       return action({ ...request, ...expected, lifecycleToken });
@@ -386,6 +387,7 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
     localize,
     readLocale: () => preferencesGateway?.readLocale?.() ?? "en",
     toggleSplitScreen: () => dispatchNavigation({ type: "toggle-split-screen" }),
+    toggleSheetCompanion: () => dispatchNavigation({ type: "toggle-sheet-companion" }),
     setQuickbarCollapsed: (collapsed) => { actionBarPreferences?.setCollapsed(collapsed); store.dispatch({ type: "set-quickbar-collapsed", collapsed }); },
     readActionBarPreferences: (source, actorSourceUuid) => actionBarPreferences?.read(source, actorSourceUuid) ?? {},
     setActionBarPage: (source, actorSourceUuid, page) => actionBarPreferences?.setPage(source, actorSourceUuid, page),
@@ -577,6 +579,7 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
       const state = store.state;
       return Object.freeze({ presentation: state.formFactor, canvasAvailable: state.canvasAvailable !== false,
         split: state.formFactor === "tablet" && state.splitScreen && state.orientation === "landscape",
+        sideBySide: tabletLayoutMode(state) === "companion",
         collective: Boolean(state.snapshot?.selectedActor?.collective),
         canPlaceActor: actorTokenEligible(state.selectedActorSourceUuid),
         actionBarSource: (preferencesGateway.actionMenu?.() ?? {}).quickbarSource ?? "character" });
@@ -1041,7 +1044,7 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
         store.dispatch({ type: "session-error", error });
       }, { /* Refresh only the journal still open on the reader route, retaining its selected page. */ onJournalChange: (journalId) => {
         const state = store.state;
-        if (state.journal?.id !== journalId || state.route !== "journals") return;
+        if (state.journal?.id !== journalId || !routeVisible(state, "journals")) return;
         void commands.openJournal(journalId, { pageId: state.journalPageId }).catch((error) => {
           diagnostics?.record?.("error", "The open Journal could not be refreshed", error);
         });

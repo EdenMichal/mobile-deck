@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Mobile Deck 1.4.0
 
 - **Swipe through journals.** In an open journal, swipe left for the next page and right for the previous one. After the last page, a swipe opens the next journal in the same folder at its first page. Before the first page, it opens the previous journal at its last page. Swipes stay inside the folder and follow the order the list shows. If the next journal can't open, the reader says why. This works in the Library and in My Journals. In My Journals, swipes are ignored while you're writing. Tap outside the page and wait for Saved.
 - **Journal folders stay open.** The Library closed every open folder whenever a journal or folder you can see changed, for example when the GM shared a new handout. Folders you open now stay open.

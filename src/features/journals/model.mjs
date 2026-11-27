@@ -1,3 +1,5 @@
+import { compareJournalEntries } from "../../kernel/journal-navigation.mjs";
+
 // Group journal records by their folder paths and sort each directory level.
 export function buildJournalTree(journals) {
   const root = branch(null, journals?.[0]?.rootSorting);
@@ -20,16 +22,9 @@ function branch(folder, sorting = "m") {
 
 // Sort folders and journal entries recursively using each branch preference.
 function sortBranch(current) {
-  current.folders = new Map(Array.from(current.folders.entries()).sort(([, left], [, right]) => compare(left.folder, right.folder, current.sorting)));
-  current.journals.sort((left, right) => compare(left, right, current.sorting));
+  current.folders = new Map(Array.from(current.folders.entries()).sort(([, left], [, right]) => compareJournalEntries(left.folder, right.folder, current.sorting)));
+  current.journals.sort((left, right) => compareJournalEntries(left, right, current.sorting));
   for (const child of current.folders.values()) sortBranch(child);
-}
-
-// Compare by label in alphabetical mode, otherwise by Foundry sort then label.
-function compare(left, right, sorting) {
-  if (sorting === "a") return String(left?.name ?? "").localeCompare(String(right?.name ?? ""));
-  return Number(left?.sort ?? 0) - Number(right?.sort ?? 0)
-    || String(left?.name ?? "").localeCompare(String(right?.name ?? ""));
 }
 
 // Count all journal entries below a branch, including nested folders.

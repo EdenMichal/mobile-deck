@@ -20,8 +20,11 @@ export function enableMobileJournalReader(scope, {
     // Restore the owned native Journal reader patch when its owning application scope ends.
     function patched(...args) {
       const options = args[0] && typeof args[0] === "object" ? args[0] : args[1] ?? {};
+      // Only a render that opens the sheet moves the phone into the reader. Foundry calls render(false)
+      // to refresh a sheet if it happens to be open; that must never pull the player into a journal.
+      if (!isActive?.() || !opensSheet(args)) return original.apply(this, args);
       const target = journalReadTarget(this, options, getGame());
-      if (!isActive?.() || !target) return original.apply(this, args);
+      if (!target) return original.apply(this, args);
       void Promise.resolve(openJournal(target.entryId, target)).catch((error) => {
         report(error);
         if (isActive?.()) void Promise.resolve(original.apply(this, args)).catch(report);
@@ -30,6 +33,13 @@ export function enableMobileJournalReader(scope, {
     }
     prototype.render = patched;
   }
+}
+
+/** True for a forced render, the one that opens a closed sheet: render(true, …) in ApplicationV1 and the
+ * boolean form of ApplicationV2, or render({ force: true }) in ApplicationV2. */
+export function opensSheet(args = []) {
+  const [first] = args;
+  return first === true || Boolean(first && typeof first === "object" && first.force === true);
 }
 
 /** Resolve a readable world Journal/page that can safely use VE's reader;

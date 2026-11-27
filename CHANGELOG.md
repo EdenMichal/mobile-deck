@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Swipe through journals.** In an open journal, swipe left for the next page and right for the previous one. After the last page, a swipe opens the next journal in the same folder at its first page. Before the first page, it opens the previous journal at its last page. Swipes stay inside the folder and follow the order the list shows. If the next journal can't open, the reader says why. This works in the Library and in My Journals. In My Journals, swipes are ignored while you're writing. Tap outside the page and wait for Saved.
+- **Journal folders stay open.** The Library closed every open folder whenever a journal or folder you can see changed, for example when the GM shared a new handout. Folders you open now stay open.
+- **Pages start at the top.** Opening a journal or turning to another page shows the top of the page instead of keeping the old scroll position.
+- **No jumps into a journal on refresh.** Foundry sometimes asks a journal window to refresh in case it's already open. The phone took that as a request to open the journal and could jump into it. Those refreshes no longer open the reader.
+
 ## Mobile Deck 1.3.0
 
 - **Side by Side on tablets.** A **Side by Side** button on the tablet rail keeps your character sheet next to Chat, Journals or Combat in landscape. Tap any of the three to change what sits beside the sheet. Scene and Settings still open full width. Turning it on turns Split Screen off, and it works when the map isn't available.

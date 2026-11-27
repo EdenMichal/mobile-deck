@@ -4,24 +4,26 @@ import { renderImageViewer } from "../../ui/image-viewer.mjs";
 import { buildJournalTree, journalBranchCount } from "./model.mjs";
 import { bindJournalFontSize } from "./font-size-controller.mjs";
 import { ensurePlayerJournalStyles } from "./player-journal-styles.mjs";
+import { bindJournalSwipe } from "./journal-swipe.mjs";
+import { libraryJournals } from "../../kernel/journal-navigation.mjs";
 
 // Render the journal library or the currently selected page from snapshot state.
-export function renderJournals({ state, commands, scope }) {
+// expandedJournalFolderIds: folders the player opened, kept by folder id so a snapshot rebuild leaves them open.
+export function renderJournals({ state, commands, scope, expandedJournalFolderIds = new Set() }) {
   if (state.journal) return journalReader(state, commands, scope);
   // Use the feature localizer with plain fallback text for library labels.
   const localize = (key, fallback, data) => commands.localize?.(key, fallback, data) ?? fallback;
   const characters = readPlayerJournalCharacters(commands);
   // A player's own notes show under My Journals, so the Library leaves those out. Notes whose
   // character is gone (deleted, or no longer theirs) stay in the Library so they are never lost.
-  const mine = new Set(characters.map((character) => character.folderId).filter(Boolean));
-  const journals = (state.snapshot?.journals ?? []).filter((journal) => !journal.playerJournal || !journal.folderPath?.some((folder) => mine.has(folder.id)));
+  const journals = libraryJournals(state.snapshot?.journals ?? [], characters.map((character) => character.folderId));
   const status = node("p", { className: `ve-journal-status${state.journalError ? " is-error" : ""}`, attrs: { role: "status", "aria-live": "polite" }, text: state.journalLoading ? localize("VEMOBILE.Journals.Opening", "Opening journal…") : localize(state.journalError, state.journalError) });
   return node("section", { className: "ve-list-screen ve-journal-library", attrs: { "aria-busy": String(Boolean(state.journalLoading)) }, children: [
     node("header", { children: [node("div", { children: [node("small", { text: localize("VEMOBILE.Journals.Library", "Library").toLocaleUpperCase() }), node("h2", { text: localize("VEMOBILE.Journals.Title", "Journals") })] }), node("span", { className: "ve-count", text: journals.length })] }),
     status,
     characters.length ? myJournals(characters, commands, scope, localize) : null,
     characters.length ? node("h3", { className: "ve-journal-library-heading", text: localize("VEMOBILE.Journals.Library", "Library") }) : null,
-    journals.length ? node("div", { className: "ve-journal-tree", children: renderBranch(buildJournalTree(journals), commands, scope) }) : node("div", { className: "ve-empty", children: [icon("fa-book-open"), node("p", { text: localize("VEMOBILE.Journals.None", "No visible journals.") })] })
+    journals.length ? node("div", { className: "ve-journal-tree", children: renderBranch(buildJournalTree(journals), commands, scope, expandedJournalFolderIds) }) : node("div", { className: "ve-empty", children: [icon("fa-book-open"), node("p", { text: localize("VEMOBILE.Journals.None", "No visible journals.") })] })
   ].filter(Boolean) });
 }
 
@@ -52,17 +54,23 @@ function myJournals(characters, commands, scope, localize) {
 }
 
 // Render one folder level while keeping journal and folder order from the model.
-function renderBranch(branch, commands, scope) {
-  return [...Array.from(branch.folders.values()).map((child) => folderNode(child, commands, scope)), ...branch.journals.map((journal) => journalButton(journal, commands, scope))];
+function renderBranch(branch, commands, scope, expanded) {
+  return [...Array.from(branch.folders.values()).map((child) => folderNode(child, commands, scope, expanded)), ...branch.journals.map((journal) => journalButton(journal, commands, scope))];
 }
 
-// Build a disclosure row for a folder and reflect native open state accessibly.
-function folderNode(branch, commands, scope) {
-  const details = node("details", { className: "ve-journal-folder", children: [
-    node("summary", { attrs: { "aria-expanded": "false" }, children: [icon("fa-chevron-right"), icon("fa-folder"), node("strong", { text: branch.folder.name }), node("small", { text: journalBranchCount(branch) })] }),
-    node("div", { className: "ve-journal-folder-contents", children: renderBranch(branch, commands, scope) })
+// Build a disclosure row for a folder, reopened by its id after a rebuild, and reflect native open state accessibly.
+function folderNode(branch, commands, scope, expanded) {
+  const folderId = String(branch.folder.id ?? "");
+  const open = expanded.has(folderId);
+  const details = node("details", { className: "ve-journal-folder", attrs: { open }, children: [
+    node("summary", { attrs: { "aria-expanded": String(open) }, children: [icon("fa-chevron-right"), icon("fa-folder"), node("strong", { text: branch.folder.name }), node("small", { text: journalBranchCount(branch) })] }),
+    node("div", { className: "ve-journal-folder-contents", children: renderBranch(branch, commands, scope, expanded) })
   ] });
-  scope.listen(details, "toggle", () => details.querySelector(":scope > summary")?.setAttribute("aria-expanded", String(details.open)));
+  scope.listen(details, "toggle", () => {
+    if (details.open) expanded.add(folderId);
+    else expanded.delete(folderId);
+    details.querySelector(":scope > summary")?.setAttribute("aria-expanded", String(details.open));
+  });
   return details;
 }
 
@@ -84,7 +92,9 @@ function journalReader(state, commands, scope) {
   const pages = journal.pages ?? [];
   const selectedIndex = Math.max(0, pages.findIndex((page) => page.id === state.journalPageId));
   const page = pages[selectedIndex] ?? null;
-  const editStatus = node("p", { className: "ve-journal-status is-error", attrs: { role: "status", "aria-live": "polite", hidden: true } });
+  // Also says why a journal failed to open from here (a swipe into the next one), which keeps the current journal on screen.
+  const editStatus = node("p", { className: "ve-journal-status is-error", attrs: { role: "status", "aria-live": "polite", hidden: !state.journalError },
+    text: state.journalError ? localize(state.journalError, state.journalError) : undefined });
   // Ask Foundry to open its editor; the gateway rechecks edit authority.
   const editCurrentPage = async () => {
     editStatus.hidden = true;
@@ -94,7 +104,7 @@ function journalReader(state, commands, scope) {
       editStatus.hidden = false;
     }
   };
-  return node("section", { className: "ve-journal-reader", children: [
+  const reader = node("section", { className: "ve-journal-reader", children: [
     node("header", { children: [
       node("button", { attrs: { type: "button", "aria-label": localize("VEMOBILE.Journals.Back", "Back to journals") }, on: { click: commands.closeJournal }, children: [icon("fa-arrow-left")] }, scope),
       node("div", { children: [node("small", { text: localize("VEMOBILE.Journals.Journal", "Journal").toLocaleUpperCase() }), node("h2", { text: journal.name })] }),
@@ -111,6 +121,17 @@ function journalReader(state, commands, scope) {
     page ? journalPage(page, state.journalHeading, commands, scope) : node("div", { className: "ve-journal-reader-empty", children: [icon("fa-file-circle-xmark"), node("p", { text: localize("VEMOBILE.Journals.Empty", "This journal has no visible pages.") })] }),
     state.journalImage ? renderImageViewer(state.journalImage, commands.closeJournalImage, scope, { localize: commands.localize }) : null
   ].filter(Boolean) });
+  // Swipe left or right for the next or previous page, then on into the neighbouring journal of the
+  // same folder. The open image viewer and page menu keep their own touches. Bound once the reader is
+  // mounted, on the pane's scroller (main or Side by Side companion) so the margins beside a
+  // width-capped reader on a tablet swipe too; the screen scope removes the listeners with the reader.
+  if (commands.swipeJournal && !state.journalImage && !state.journalMenuOpen) queueMicrotask(() => {
+    if (scope.disposed || reader.isConnected === false) return;
+    bindJournalSwipe(reader.closest?.(".ve-viewport, .ve-companion-viewport") ?? reader, { scope, content: reader,
+      onSwipe: (direction) => commands.swipeJournal(direction),
+      blocked: (target) => Boolean(target?.closest?.(".ve-journal-page-menu, .ve-image-viewer, input, textarea, select, [contenteditable='true']")) });
+  });
+  return reader;
 }
 
 // Present rich text, image pages, or a link for other readable attachments.

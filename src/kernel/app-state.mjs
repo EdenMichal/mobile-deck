@@ -243,8 +243,9 @@ function reduceState(state, event) {
       return { ...state, journalLoading: true, journalError: "", journalImage: null };
     case "journal-loaded": {
       const pages = event.journal?.pages ?? [];
+      // A negative pageIndex counts from the end: a swipe back into the previous journal asks for -1.
       const requested = pages.find((page) => page.id === event.target?.pageId)
-        ?? (Number.isInteger(event.target?.pageIndex) ? pages[event.target.pageIndex] : null);
+        ?? (Number.isInteger(event.target?.pageIndex) ? pages.at(event.target.pageIndex) : null);
       const pageId = requested?.id ?? pages[0]?.id ?? "";
       return { ...state, journal: event.journal, journalLoading: false, journalError: "", journalPageId: pageId,
         journalHeading: requested && event.target?.anchor ? String(event.target.anchor) : "",

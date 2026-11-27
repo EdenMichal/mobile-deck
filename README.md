@@ -130,7 +130,7 @@ Turn on **Return to Scene after actions** if you want supported actions to bring
 ## Chat, journals, and combat
 
 - **Chat** keeps your system's roll cards and messages, with an unread badge that clears when you reach the newest message.
-- **Journals** show folders and pages. Pinch to change text size, or open an image to zoom in.
+- **Journals** show folders and pages. Swipe left or right to turn pages. Past the last page, a swipe moves on to the next journal in the same folder. Pinch to change text size, or open an image to zoom in.
 - **My Journals** (players) sit above the Library, one row per character. Tap **New** for a folder or journal, **Add page** for a text or picture page, and **⋯** on any row to rename, move, reorder or delete it. Pages save as you type. New folders, journals and pictures need a GM online; writing doesn't. Privacy works as it does for any Foundry journal. Other players can't open these notes in Foundry or Mobile Deck. Foundry still sends every journal to every connected browser, though, so someone using the browser's developer tools could read them.
 - **Combat** shows the turn order and the controls your role allows. The optional carousel keeps the order and **End Turn** on the map.
 

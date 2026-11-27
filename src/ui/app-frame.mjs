@@ -60,6 +60,8 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
   let renderedCompanion = null;
   let sceneChooserScope = null;
   const expandedSceneFolderIds = new Set();
+  // Journal Library folders the player opened, by folder id, shared by the main and companion panes.
+  const expandedJournalFolderIds = new Set();
   const expandedSceneLevelIds = new Set();
   let renderedSceneChooserKey = "";
   let renderedSplitSceneKey = "";
@@ -826,9 +828,12 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
         scope: screenScope,
         overlayHost: paneOverlays ? panelOverlays : null,
         expandedFolderIds: expandedSceneFolderIds,
+        expandedJournalFolderIds,
         expandedLevelSceneIds: expandedSceneLevelIds,
         sceneChoiceTransition
       }));
+      // A new page or journal in the reader starts at its top rather than at the old scroll offset.
+      if (state.route === "journals" && journalPageTurned(renderedState, state)) viewport.scrollTop = 0;
       if (state.route === "characters") characterHeaderScroll = bindCharacterHeaderScroll({ scroller: characterScroller(), screen: viewport.firstElementChild, scope: screenScope, restorePosition: restoreCharacterScrollPosition });
       if (nextCharacterContext) restoreCharacterScroll(state, desiredCharacterScrollTop);
     } catch (error) {
@@ -1097,6 +1102,7 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     metricsScope = null;
     sceneInteractionListeners.clear();
     expandedSceneFolderIds.clear();
+    expandedJournalFolderIds.clear();
     expandedSceneLevelIds.clear();
     renderedSceneChooserKey = "";
     renderedSplitSceneKey = "";
@@ -1148,8 +1154,8 @@ export function createAppFrame({ store, commands, policy, scope, mobileBackGatew
     companionViewport.setAttribute("aria-label", label);
     try {
       performanceObserver?.increment?.(`render.companion.${route}`);
-      companionViewport.replaceChildren(SCREENS[route]({ state, commands, scope: companionScope, overlayHost: null }));
-      if (routeChanged) companionViewport.scrollTop = 0;
+      companionViewport.replaceChildren(SCREENS[route]({ state, commands, scope: companionScope, overlayHost: null, expandedJournalFolderIds }));
+      if (routeChanged || (route === "journals" && journalPageTurned(renderedCompanion, next))) companionViewport.scrollTop = 0;
     } catch (error) {
       console.error(`Mobile Deck | Could not render ${route} beside the character sheet`, error);
       companionScope.dispose();
@@ -1965,6 +1971,13 @@ export function journalPresentationChanged(previous, current) {
     || previous?.journalHeading !== current?.journalHeading
     || previous?.journalMenuOpen !== current?.journalMenuOpen
     || previous?.journalImage !== current?.journalImage;
+}
+
+// True when the reader now shows a different journal or page than before (a swipe, a page choice or
+// opening a journal), so its scroller should start at the top. A chosen heading scrolls itself.
+export function journalPageTurned(previous, current) {
+  if (!current?.journal || current.journalHeading) return false;
+  return previous?.journal?.id !== current.journal.id || previous?.journalPageId !== current.journalPageId;
 }
 
 // Build the split-pane chooser from a fresh narrow navigation snapshot and the shared transition owner.

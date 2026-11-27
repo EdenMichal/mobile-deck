@@ -141,6 +141,10 @@ export function mountPageWriter({ page, t, readFontSize = () => 16, scope, canEd
     element,
     external,
     flush: () => { if (dirty) void saveNow(); },
+    // Nothing being written: the editor isn't focused, every change is saved and no conflict is showing.
+    // Swiping to another page waits for this, so it never leaves unsaved text behind.
+    idle: () => !dirty && !saving && banner.hidden && status.dataset.state !== "error"
+      && !(document.activeElement && editor.contains(document.activeElement)),
     dispose: () => { if (disposed) return; if (dirty) void saveNow(); disposed = true; clearTimeout(timer); }
   };
 }

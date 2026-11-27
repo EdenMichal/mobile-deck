@@ -23,7 +23,7 @@ export function createScope() {
   const disposers = [];
   return {
     disposed: false,
-    listen(element, type, listener) { element.addEventListener(type, listener); disposers.push(() => element.removeEventListener(type, listener)); },
+    listen(element, type, listener, options) { element.addEventListener(type, listener, options); disposers.push(() => element.removeEventListener(type, listener, options)); },
     own(fn) { disposers.push(fn); },
     dispose() { this.disposed = true; while (disposers.length) { try { disposers.pop()(); } catch { /* keep disposing */ } } }
   };

@@ -10,6 +10,7 @@ import { createNativeTokenPlacementController } from "./native-token-placement-s
 import { ACTOR_COMMANDS } from "./command-names.mjs";
 import { createActionSceneReturn } from "./action-scene-return.mjs";
 import { routeVisible, tabletLayoutMode } from "./tablet-layout.mjs";
+import { readerClosed, readerSwipeTarget } from "./journal-navigation.mjs";
 import { createModeTransitionCoordinator, presentationLabel } from "./mode-transition.mjs";
 
 // Recognise an exact selected/listed actor source instead of treating a matching world Actor ID as sufficient.
@@ -36,6 +37,8 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
   let frame = null;
   let rollResultSequence = 0;
   let journalRequestSequence = 0;
+  // The journal the latest openJournal request is reading, while it is in flight.
+  let loadingJournalId = "";
   let resynchronizer = null;
   let sceneInteractionReadiness = null;
   let combatSceneActions = null;
@@ -350,6 +353,7 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
     openJournal: async (journalId, target = {}) => {
       const request = ++journalRequestSequence;
       const generation = connectionGeneration?.current ?? 0;
+      loadingJournalId = String(journalId ?? "");
       store.dispatch({ type: "journal-loading" });
       try {
         const journal = await session.readJournal(journalId, expectedSession());
@@ -360,7 +364,24 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
           store.dispatch({ type: "journal-error", error });
         }
         throw error;
+      } finally {
+        if (request === journalRequestSequence) loadingJournalId = "";
       }
+    },
+    // Swipe in the reader: the neighbouring page, or the next/previous journal in the same Library folder.
+    // Ignored while a journal is loading, so a quick second swipe can't act on the journal being left.
+    swipeJournal: (direction) => {
+      let ownFolderIds = [];
+      try { ownFolderIds = (playerJournals?.available?.() ? playerJournals.characters() : []).map((character) => character.folderId); }
+      catch { ownFolderIds = []; }
+      const target = readerSwipeTarget(store.state, { direction, ownFolderIds });
+      if (!target) return false;
+      if (target.kind === "page") {
+        store.dispatch({ type: "select-journal-page", pageId: target.pageId });
+        return true;
+      }
+      void commands.openJournal(target.journalId, { pageIndex: target.edge === "last" ? -1 : 0 }).catch(() => {});
+      return true;
     },
     closeJournal: () => {
       journalRequestSequence += 1;
@@ -1018,7 +1039,11 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
         scope: runtimeScope,
         diagnostics
       }) : null;
+      let readerBefore = store.state;
       runtimeScope.own(store.subscribe((state) => {
+        // A load still in flight (a swipe into the next journal) must not reopen a reader that just closed.
+        if (readerClosed(readerBefore, state)) journalRequestSequence += 1;
+        readerBefore = state;
         if (state.reconnect || state.modeTransition) { actorEditorGateway?.closeAll?.(); builderGateway?.close?.(); playerJournals?.close?.(); }
         const placement = state.actorTokenPlacement;
         if (placement && (state.route !== "scene" || state.templatePlacement || state.reconnect || state.modeTransition
@@ -1045,6 +1070,8 @@ export function createAppKernel({ store, session, commandGateway, biographyGatew
       }, { /* Refresh only the journal still open on the reader route, retaining its selected page. */ onJournalChange: (journalId) => {
         const state = store.state;
         if (state.journal?.id !== journalId || !routeVisible(state, "journals")) return;
+        // A swipe is already opening the neighbouring journal; refreshing this one would cancel it.
+        if (state.journalLoading && loadingJournalId && loadingJournalId !== journalId) return;
         void commands.openJournal(journalId, { pageId: state.journalPageId }).catch((error) => {
           diagnostics?.record?.("error", "The open Journal could not be refreshed", error);
         });

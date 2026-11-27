@@ -5,6 +5,8 @@
  *
  * Screens: home (the character's folders and journals) → folder → journal (its pages) → writer
  * (a text page) or picture (an image page). Every row has a ⋯ menu: rename, move, reorder, delete.
+ * On a writer or picture screen a sideways swipe turns to the next or previous page, then on into
+ * the neighbouring journal of the same folder (kernel/journal-navigation.mjs), as in the Library.
  * The gateway (foundry/player-journal-gateway.mjs) does the work and re-checks every permission.
  */
 import { icon, node } from "../../ui/dom.mjs";
@@ -12,6 +14,8 @@ import { createShell, createScope } from "../builder/builder-shell.mjs";
 import { emptyCard, rowArt, rowCopy, sheetCard } from "../builder/ve-parts.mjs";
 import { ROLES, fitImage, MAX_IMAGE_BYTES } from "../../kernel/player-journal-rules.mjs";
 import { mountPageWriter } from "./page-writer.mjs";
+import { bindJournalSwipe } from "./journal-swipe.mjs";
+import { journalSwipeTarget } from "../../kernel/journal-navigation.mjs";
 import { ensurePlayerJournalStyles } from "./player-journal-styles.mjs";
 
 const REFRESH_DELAY_MS = 120;
@@ -160,6 +164,8 @@ function mountPlayerJournals(host, { gateway, t, character, readFontSize, onClos
     };
     s.own(() => writer.dispose());
     setBody(writer.element);
+    // Never while writing: the editor must be unfocused and saved before a swipe turns the page.
+    bindPageSwipe(s, journal, page, () => writer.idle());
   }
 
   function showPicture(journal, page) {
@@ -167,6 +173,7 @@ function mountPlayerJournals(host, { gateway, t, character, readFontSize, onClos
       back: () => go({ screen: "journal", journalId: journal.id, folderId: journal.folderId }) });
     let timer = null;
     let pending = null;
+    let saving = false;
     const status = node("small", { className: "ve-pj-save-status", attrs: { role: "status", "aria-live": "polite" } });
     const caption = node("textarea", { className: "ve-builder-textarea ve-pj-caption", attrs: { rows: 3, maxlength: 500, placeholder: t("CaptionPlaceholder", "Add a caption"), readonly: !page.canEdit } });
     caption.value = page.caption;
@@ -175,8 +182,11 @@ function mountPlayerJournals(host, { gateway, t, character, readFontSize, onClos
       const value = pending;
       pending = null;
       status.textContent = t("Saving", "Saving…");
+      saving = true;
       return gateway.saveCaption(journal.id, page.id, value).then(() => { status.textContent = t("Saved", "Saved"); },
-        error => { status.textContent = t("NotSaved", "Not saved"); showError(error?.message ?? String(error)); });
+        // Keep the unsaved caption (unless newer typing replaced it) so leaving the screen tries again.
+        error => { pending ??= value; status.textContent = t("NotSaved", "Not saved"); showError(error?.message ?? String(error)); })
+        .finally(() => { saving = false; });
     };
     s.listen(caption, "input", () => { pending = caption.value; clearTimeout(timer); timer = setTimeout(() => void save(), 900); });
     screenHandle = { flush: () => { clearTimeout(timer); void save(); }, onHook: (hook, document) => {
@@ -189,6 +199,31 @@ function mountPlayerJournals(host, { gateway, t, character, readFontSize, onClos
       page.src ? node("img", { attrs: { src: page.src, alt: page.caption || page.name } }) : emptyCard(t("NoPicture", "This page has no picture.")),
       node("figcaption", { children: [caption, status] })
     ] }));
+    bindPageSwipe(s, journal, page, () => pending === null && !saving && document.activeElement !== caption);
+  }
+
+  // ---- Swiping between pages ----
+  // Pages the phone opens (text and pictures), in the order the journal screen lists them.
+  const readablePages = entry => (entry?.pages ?? []).filter(item => item.type === "text" || item.type === "image");
+  function bindPageSwipe(s, journal, page, ready) {
+    bindJournalSwipe(shell.body, { scope: s, onSwipe: direction => swipeFrom(journal.id, page.id, direction),
+      blocked: target => Boolean(sheet) || shell.isBusy() || !ready() || Boolean(target?.closest?.(".ve-pj-toolbar, .ve-pj-banner, input, textarea")) });
+  }
+  function swipeFrom(journalId, pageId, direction) {
+    const journal = gateway.journal(journalId);
+    if (!journal || sheet || shell.isBusy()) return;
+    // The journals listed with this one: the character folder's own, or one player folder's.
+    const tree = gateway.tree(folderId);
+    const listed = journal.folderId === folderId ? tree?.journals : tree?.folders.find(entry => entry.folder.id === journal.folderId)?.journals;
+    const siblings = (listed ?? []).map(entry => (entry.id === journal.id ? journal : gateway.journal(entry.id))).filter(Boolean);
+    const target = journalSwipeTarget({ journalId: journal.id, pageIds: readablePages(journal).map(item => item.id), pageId, direction,
+      siblings: siblings.map(entry => ({ id: entry.id, pageCount: readablePages(entry).length })) });
+    if (!target) return;
+    const destination = target.kind === "page" ? journal : siblings.find(entry => entry.id === target.journalId);
+    const pages = readablePages(destination);
+    const landing = target.kind === "page" ? pages.find(item => item.id === target.pageId) : target.edge === "last" ? pages.at(-1) : pages[0];
+    if (!landing) return;
+    go({ screen: landing.type === "image" ? "picture" : "writer", journalId: destination.id, pageId: landing.id, folderId: destination.folderId });
   }
 
   // ---- Rows ----
